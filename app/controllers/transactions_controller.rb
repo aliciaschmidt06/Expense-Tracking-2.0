@@ -1,9 +1,45 @@
 class TransactionsController < ApplicationController
   before_action :set_transaction, only: %i[ show edit update destroy ]
+  before_action :load_categories, only: %i[ new edit create update ]
 
   # GET /transactions or /transactions.json
   def index
-    @transactions = Transaction.all
+    @transactions = Transaction.all.includes(:category)
+    @categories = Category.order(:name)
+
+    # Search by name
+    if params[:q].present?
+      q = params[:q].to_s.downcase
+      @transactions = @transactions.where("LOWER(name) LIKE ?", "%#{q}%")
+    end
+
+    # Date range filtering (use created_at as the transaction date)
+    if params[:start_date].present?
+      begin
+        start_date = Date.parse(params[:start_date])
+        @transactions = @transactions.where("created_at >= ?", start_date.beginning_of_day)
+      rescue ArgumentError
+        # ignore invalid date
+      end
+    end
+
+    if params[:end_date].present?
+      begin
+        end_date = Date.parse(params[:end_date])
+        @transactions = @transactions.where("created_at <= ?", end_date.end_of_day)
+      rescue ArgumentError
+        # ignore invalid date
+      end
+    end
+
+    # Sorting by date: default to desc
+    sort = params[:sort].to_s.downcase == 'asc' ? :asc : :desc
+    @transactions = @transactions.order(created_at: sort)
+
+    # Filter by category if selected
+    if params[:category_id].present?
+      @transactions = @transactions.where(category_id: params[:category_id])
+    end
   end
 
   # GET /transactions/1 or /transactions/1.json
@@ -60,6 +96,10 @@ class TransactionsController < ApplicationController
   private
     def set_transaction
       @transaction = Transaction.find(params[:id])
+    end
+
+    def load_categories
+      @categories = Category.order(:name)
     end
 
     def transaction_params

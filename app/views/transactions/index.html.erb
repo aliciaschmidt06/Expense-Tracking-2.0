@@ -12,23 +12,60 @@
     <h1 class="text-3xl font-semibold text-gray-900">
       Transactions
     </h1>
+    <div class="flex items-center space-x-4">
+      <%= link_to "Upload Transactions from csv",
+            new_import_path,
+            class: "bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-md
+                   hover:bg-green-700 hover:shadow-lg transition" %>
 
-     <%= link_to "Upload Transactions from csv",
-          new_import_path,
-          class: "bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-md
-                 hover:bg-green-700 hover:shadow-lg transition" %>
+      <%= link_to "New Transaction",
+            new_transaction_path,
+            class: "bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-md
+                    hover:bg-blue-700 hover:shadow-lg transition" %>
+    </div>
+  </div>
 
-    <%= link_to "New Transaction",
-          new_transaction_path,
-          class: "bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-md
-                  hover:bg-blue-700 hover:shadow-lg transition" %>
+  <!-- Filters: search, date range, sort, group -->
+  <div class="mb-6 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+    <%= form_with url: transactions_path, method: :get, local: true, class: "space-y-4" do |f| %>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <%= f.label :q, "Search name", class: "text-sm font-medium text-gray-700" %>
+          <%= f.text_field :q, value: params[:q], placeholder: "Search transactions...", class: "mt-1 block w-full max-w-sm rounded-md border-gray-300 px-3 py-2" %>
+        </div>
+
+        <div>
+          <%= f.label :category_id, "Category", class: "text-sm font-medium text-gray-700" %>
+          <%= f.select :category_id, options_for_select([["All categories",""]] + @categories.map { |c| [c.name, c.id] }, params[:category_id]), {}, class: "mt-1 block max-w-sm rounded-md border-gray-300 px-3 py-2" %>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div>
+          <%= f.label :start_date, "Start date", class: "text-sm font-medium text-gray-700" %>
+          <%= f.date_field :start_date, value: params[:start_date], class: "mt-1 block w-full max-w-xs rounded-md border-gray-300 px-3 py-2" %>
+        </div>
+
+        <div>
+          <%= f.label :end_date, "End date", class: "text-sm font-medium text-gray-700" %>
+          <%= f.date_field :end_date, value: params[:end_date], class: "mt-1 block w-full max-w-xs rounded-md border-gray-300 px-3 py-2" %>
+        </div>
+
+        <div>
+          <%= f.label :sort, "Order", class: "text-sm font-medium text-gray-700" %>
+          <%= f.select :sort, options_for_select([["Newest first","desc"],["Oldest first","asc"]], params[:sort] || "desc"), {}, class: "mt-1 block max-w-xs rounded-md border-gray-300 px-3 py-2" %>
+        </div>
+
+        <div class="">
+          <%= f.submit "Apply", class: "w-full px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" %>
+        </div>
+      </div>
+    <% end %>
   </div>
 
   <div id="transactions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     <% @transactions.each do |transaction| %>
-      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col justify-between
-                  transition hover:shadow-md hover:-translate-y-0.5">
-
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col justify-between transition hover:shadow-md hover:-translate-y-0.5">
         <%= render transaction %>
 
         <div class="mt-4">
