@@ -1,0 +1,40 @@
+<%= form_with(model: @category, local: true, class: "space-y-6") do |f| %>
+
+  <h2 class="text-2xl font-bold mb-6 text-left">
+      Create New Category
+    </h2>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+    <!-- Name field -->
+    <div class="flex flex-col md:flex-row md:items-center md:space-x-4">
+      <%= f.label :name, class: "text-gray-700 font-medium w-32 md:text-right" %>
+      <%= f.text_field :name, 
+            class: "flex-1 border border-gray-300 rounded-lg px-4 py-2
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" %>
+    </div>
+
+    <!-- Target Percentage field -->
+    <div class="flex flex-col md:flex-row md:items-center md:space-x-4">
+      <%= f.label :target_percentage, "Target (%)", class: "text-gray-700 font-medium w-32 md:text-right" %>
+      <%= f.number_field :target_percentage, 
+            class: "flex-1 border border-gray-300 rounded-lg px-4 py-2
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" %>
+    </div>
+  </div>
+
+  <!-- Keywords field (full width) -->
+  <div class="flex flex-col md:flex-row md:items-center md:space-x-4">
+    <%= f.label :keywords, class: "text-gray-700 font-medium w-32 md:text-right" %>
+    <%= f.text_field :keywords, 
+          class: "flex-1 border border-gray-300 rounded-lg px-4 py-2
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" %>
+  </div>
+
+  <!-- Submit button -->
+  <div class="flex justify-end">
+    <%= f.submit "Save Category", 
+          class: "bg-blue-600 text-white px-6 py-2 rounded-lg font-medium shadow-md
+                 hover:bg-blue-700 hover:shadow-lg transition" %>
+  </div>
+
+<% end %>

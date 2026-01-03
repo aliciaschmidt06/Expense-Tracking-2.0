@@ -1,0 +1,32 @@
+<div id="<%= dom_id transaction %>">
+    <div>
+    <strong>Name: </strong>
+    <%= transaction.name %>
+  </div>
+
+  <div>
+    <strong>Amount: $</strong>
+    <%= transaction.amount %>
+  </div>
+
+  <div>
+    <strong>Transaction type:</strong>
+    <%= transaction.transaction_type %>
+  </div>
+
+  <div>
+    <strong>Account name:</strong>
+    <%= transaction.account_name %>
+  </div>
+
+  <div>
+    <strong>Category:</strong>
+    <%= transaction.category.name %>
+  </div>
+
+  <div>
+    <strong>To be reimbursed:</strong>
+    <%= transaction.to_be_reimbursed %>
+  </div>
+
+</div>

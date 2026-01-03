@@ -1,0 +1,27 @@
+# Example categories yaml file you can download and fill out.
+# Once finished customizing for yourself, save and upload. 
+categories:
+  guilt-free-spending:
+    keywords:
+      - restaurant
+      - cafe
+      - cinemma
+    target_percentage: 30
+  travel:
+    keywords:
+      - westjet
+      - taxi
+      - uber
+    target_percentage: 10
+  fixed:
+    keywords:
+      - rent
+      - insurance
+      - gas
+    target_percentage: 50
+  investments:
+    keywords:
+      - bank transfer
+      - wealthsimple
+      - quest trade
+    target_percentage: 10

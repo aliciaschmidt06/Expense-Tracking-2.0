@@ -1,0 +1,41 @@
+<% content_for :title, "Categories" %>
+
+<div class="min-h-screen w-full bg-gray-50 px-12 py-10">
+
+  <% if notice.present? %>
+    <div class="mb-6 rounded-lg bg-green-50 border border-green-200 text-green-700 px-4 py-3 shadow-sm">
+      <%= notice %>
+    </div>
+  <% end %>
+
+  <!-- Header with title and upload button -->
+  <div class="flex flex-col md:flex-row items-center justify-between mb-8">
+    <h1 class="text-3xl font-semibold text-gray-900 mb-4 md:mb-0">
+      Categories
+    </h1>
+
+    <!-- Upload Categories button -->
+    <%= link_to "Upload Categories from YAML",
+          new_category_import_path,
+          class: "bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-md
+                 hover:bg-green-700 hover:shadow-lg transition" %>
+  </div>
+
+  <!-- Categories grid -->
+  <div id="categories" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <% @categories.each do |category| %>
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 transition hover:shadow-md hover:-translate-y-0.5">
+        <div>
+          <%= render category %>
+        </div>
+
+        <div class="mt-4">
+          <%= link_to "View category",
+                category,
+                class: "inline-flex items-center text-blue-600 font-medium hover:text-blue-700" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+</div>

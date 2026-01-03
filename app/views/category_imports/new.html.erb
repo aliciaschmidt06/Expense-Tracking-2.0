@@ -1,0 +1,43 @@
+<div class="min-h-screen w-full bg-white flex flex-col">
+  <header class="px-12 py-6 border-b">
+
+    <h2 class="text-2xl font-bold mb-6 text-center">
+      Upload Categories from YAML file
+    </h2>
+
+    <%= form_with url: category_imports_path,  # <- POST route
+                  multipart: true,
+                  class: "space-y-6",
+                  data: { controller: "dropzone" } do |f| %>
+
+      <!-- Label + Download Template -->
+      <div class="flex items-center justify-between md:space-x-4">
+        <label class="text-gray-700 font-medium">
+          Upload categories.config.yaml
+        </label>
+        <%= link_to "Download Template", "/categories.template.yaml",
+                class: "bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 text-sm",
+                download: "template.yaml" %>
+      </div>
+
+      <!-- YAML Drag & Drop -->
+      <div data-dropzone-target="configArea"
+           class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50 relative">
+        <p class="text-gray-600">Drag & drop YAML here or click to upload</p>
+        <%= f.file_field :config,
+              accept: ".yaml,.yml",
+              class: "hidden",
+              data: { dropzone_target: "configInput", action: "change->dropzone#configSelected" } %>
+        <p data-dropzone-target="configFilename" class="mt-2 text-sm text-gray-700"></p>
+      </div>
+
+      <%= f.submit "Import Categories", class: "w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700" %>
+
+    <% end %>
+
+    <div class="mt-4 text-center">
+      <%= link_to "← Back", categories_path, class: "text-sm text-gray-600" %>
+    </div>
+
+  </header>
+</div>

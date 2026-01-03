@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  name: TransactionOne
+  amount: 1.5
+  transaction_type: 1
+  account_name: MyString
+  category: one
+  to_be_reimbursed: false
+
+two:
+  name: TransactionTwo
+  amount: 1.5
+  transaction_type: 1
+  account_name: MyString
+  category: two
+  to_be_reimbursed: false

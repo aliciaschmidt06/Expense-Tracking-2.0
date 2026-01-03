@@ -1,0 +1,38 @@
+<div class="min-h-screen w-full bg-white flex flex-col">
+  <header class="px-12 py-6 border-b">
+
+    <h2 class="text-2xl font-bold mb-6 text-center">
+      Upload Transactions CSV
+    </h2>
+
+    <%= form_with url: transactions_import_path,
+                  multipart: true,
+                  class: "space-y-6",
+                  data: { controller: "dropzone" } do |f| %>
+
+      <!-- Account Name -->
+      <div class="flex flex-col md:flex-row md:items-center md:space-x-4">
+        <%= f.label :account_name, "Account Name", class: "text-gray-700 font-medium w-32 md:text-right" %>
+        <%= f.text_field :account_name,
+              class: "flex-1 border border-gray-300 rounded-md px-4 py-2
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" %>
+      </div>
+
+      <!-- Transactions CSV -->
+      <div data-dropzone-target="area"
+           class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50 relative">
+        <p class="text-gray-600">Drag & drop CSV here or click to upload</p>
+        <%= f.file_field :file,
+              accept: ".csv",
+              class: "hidden",
+              data: { dropzone_target: "input", action: "change->dropzone#fileSelected" } %>
+        <p data-dropzone-target="filename" class="mt-2 text-sm text-gray-700"></p>
+      </div>
+
+      <%= f.submit "Import Transactions",
+            class: "w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700" %>
+
+    <% end %> 
+
+  </header>
+</div>
