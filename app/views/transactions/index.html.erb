@@ -63,6 +63,11 @@
     <% end %>
   </div>
 
+  <%# Result count label %>
+  <div class="mb-4 text-sm text-gray-600">
+    Showing <span class="font-medium text-gray-900"><%= @results_count || @transactions.size %></span> result<%= (@results_count || @transactions.size) == 1 ? "" : "s" %>
+  </div>
+
   <div id="transactions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     <% @transactions.each do |transaction| %>
       <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col justify-between transition hover:shadow-md hover:-translate-y-0.5">

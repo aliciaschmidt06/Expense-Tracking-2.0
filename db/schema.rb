@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_03_030202) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_03_120000) do
   create_table "categories", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "keywords"
@@ -28,8 +28,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_03_030202) do
     t.string "name"
     t.boolean "to_be_reimbursed", default: false
     t.integer "transaction_type", default: 0, null: false
+    t.string "uid"
     t.datetime "updated_at", null: false
     t.index ["category_id"], name: "index_transactions_on_category_id"
+    t.index ["uid"], name: "index_transactions_on_uid", unique: true
   end
 
   add_foreign_key "transactions", "categories"

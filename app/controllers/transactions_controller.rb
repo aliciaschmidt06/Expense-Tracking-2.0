@@ -40,6 +40,9 @@ class TransactionsController < ApplicationController
     if params[:category_id].present?
       @transactions = @transactions.where(category_id: params[:category_id])
     end
+
+    # Count results for the view (after filters applied)
+    @results_count = @transactions.count
   end
 
   # GET /transactions/1 or /transactions/1.json
