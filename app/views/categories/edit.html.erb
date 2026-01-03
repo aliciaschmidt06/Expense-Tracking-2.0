@@ -1,12 +1,23 @@
-<% content_for :title, "Editing category" %>
+<% content_for :title, "Edit Category" %>
 
-<h1>Editing category</h1>
+<div class="min-h-screen bg-gray-100 flex items-center justify-center">
+  <div class="bg-white w-full max-w-2xl p-8 rounded-xl shadow-lg">
 
-<%= render "form", category: @category %>
+    <h1 class="text-2xl font-bold mb-6 text-gray-900">
+      Edit Category
+    </h1>
 
-<br>
+    <%= render "form", category: @category %>
 
-<div>
-  <%= link_to "Show this category", @category %> |
-  <%= link_to "Back to categories", categories_path %>
+    <div class="mt-6 flex justify-between text-sm">
+      <%= link_to "← Back to Categories",
+            categories_path,
+            class: "text-gray-600 hover:text-gray-900" %>
+
+      <%= link_to "View Category",
+            @category,
+            class: "text-blue-600 hover:underline" %>
+    </div>
+
+  </div>
 </div>

@@ -15,8 +15,8 @@ class CategoryImportsController < ApplicationController
     begin
       yaml_data = YAML.safe_load(config_file.read)
 
-      # Compute summed total percentage from uploaded YAML. Treat missing values as 0.
       total_percentage = 0.0
+
       if yaml_data["categories"].present?
         yaml_data["categories"].each do |_name, details|
           next unless details.is_a?(Hash)
@@ -24,14 +24,26 @@ class CategoryImportsController < ApplicationController
         end
       end
 
-      # Provide the total to the next page via flash so the `new` view can display it.
       flash[:import_total] = total_percentage
       flash[:import_total_ok] = (total_percentage <= 100.0)
 
       if yaml_data["categories"].present?
         yaml_data["categories"].each do |name, details|
+          next unless details.is_a?(Hash)
+
           category = Category.find_or_initialize_by(name: name)
-          category.keywords = details["keywords"] || []
+
+          raw_keywords = details["keywords"]
+          category.keywords =
+            case raw_keywords
+            when Array
+              raw_keywords.map(&:to_s)
+            when String
+              [raw_keywords]
+            else
+              []
+            end
+
           category.target_percentage = details["target_percentage"] || 0
           category.save!
         end
@@ -42,7 +54,8 @@ class CategoryImportsController < ApplicationController
     rescue Psych::SyntaxError => e
       redirect_to new_category_import_path, alert: "Invalid YAML file: #{e.message}"
     rescue ActiveRecord::RecordInvalid => e
-      redirect_to new_category_import_path, alert: "Failed to save category '#{e.record.name}': #{e.record.errors.full_messages.join(', ')}"
+      redirect_to new_category_import_path,
+                  alert: "Failed to save category '#{e.record.name}': #{e.record.errors.full_messages.join(', ')}"
     end
   end
 end

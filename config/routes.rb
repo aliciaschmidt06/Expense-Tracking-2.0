@@ -3,6 +3,8 @@ Rails.application.routes.draw do
   get "category_imports/create"
   root "home#index"
   resources :transactions
+  # Export categories YAML for download
+  get 'categories/download_yaml', to: 'categories#download_yaml', as: 'download_categories_yaml'
   resources :categories
   
   resource :import, only: [:new] do

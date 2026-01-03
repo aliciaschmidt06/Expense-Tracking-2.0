@@ -1,9 +1,12 @@
-<%= form_with(model: category) do |form| %>
-  <% if category.errors.any? %>
-    <div style="color: red">
-      <h2><%= pluralize(category.errors.count, "error") %> prohibited this category from being saved:</h2>
+<%= form_with(model: category, class: "space-y-6") do |form| %>
 
-      <ul>
+  <% if category.errors.any? %>
+    <div class="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md">
+      <h2 class="font-semibold mb-2">
+        <%= pluralize(category.errors.count, "error") %> prohibited this category from being saved:
+      </h2>
+
+      <ul class="list-disc list-inside text-sm">
         <% category.errors.each do |error| %>
           <li><%= error.full_message %></li>
         <% end %>
@@ -11,22 +14,48 @@
     </div>
   <% end %>
 
-  <div>
-    <%= form.label :name, style: "display: block" %>
-    <%= form.text_field :name %>
+  <!-- Name -->
+  <div class="flex items-center gap-4">
+    <%= form.label :name,
+          class: "w-44 text-sm font-medium text-gray-700" %>
+
+    <%= form.text_field :name,
+          class: "flex-1 rounded-md border border-gray-300 px-3 py-2
+                  focus:border-blue-500 focus:ring-blue-500" %>
   </div>
 
-  <div>
-    <%= form.label :target_percentage, style: "display: block" %>
-    <%= form.text_field :target_percentage %>
+  <!-- Target Percentage -->
+  <div class="flex items-center gap-4">
+    <%= form.label :target_percentage,
+          "Target %",
+          class: "w-44 text-sm font-medium text-gray-700" %>
+
+    <%= form.number_field :target_percentage,
+          step: 0.01,
+          class: "flex-1 rounded-md border border-gray-300 px-3 py-2
+                  focus:border-blue-500 focus:ring-blue-500" %>
   </div>
 
-  <div>
-    <%= form.label :keywords, style: "display: block" %>
-    <%= form.textarea :keywords %>
+  <!-- Keywords -->
+  <div class="flex items-start gap-4">
+    <%= form.label :keywords,
+          class: "w-44 pt-2 text-sm font-medium text-gray-700" %>
+
+    <%= form.text_area :keywords,
+          rows: 3,
+          placeholder: "uber, restaurant, coffee",
+          class: "flex-1 rounded-md border border-gray-300 px-3 py-2
+                  focus:border-blue-500 focus:ring-blue-500" %>
   </div>
 
-  <div>
-    <%= form.submit %>
+  <!-- Actions -->
+  <div class="flex justify-end gap-3 pt-4">
+    <%= link_to "Cancel",
+          categories_path,
+          class: "px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200" %>
+
+    <%= form.submit "Save Category",
+          class: "px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700" %>
   </div>
+
 <% end %>
