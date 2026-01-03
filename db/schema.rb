@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_02_184750) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_03_030202) do
   create_table "categories", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "keywords"
@@ -24,6 +24,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_02_184750) do
     t.float "amount"
     t.integer "category_id", null: false
     t.datetime "created_at", null: false
+    t.boolean "display", default: true, null: false
     t.string "name"
     t.boolean "to_be_reimbursed", default: false
     t.integer "transaction_type", default: 0, null: false

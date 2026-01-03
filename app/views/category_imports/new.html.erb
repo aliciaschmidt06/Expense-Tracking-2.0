@@ -1,6 +1,26 @@
 <div class="min-h-screen w-full bg-white flex flex-col">
   <header class="px-12 py-6 border-b">
 
+    <% if flash[:import_total].present? %>
+      <% total = flash[:import_total].to_f %>
+      <% ok = flash[:import_total_ok] == true %>
+      <div class="mb-4 p-3 rounded-md <%= ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200' %>">
+        <div class="flex items-center justify-between">
+          <div>
+            <strong class="text-sm text-gray-700">Imported categories total</strong>
+            <div class="text-xl font-semibold <%= ok ? 'text-green-700' : 'text-red-700' %>"><%= sprintf("%.2f", total) %>%</div>
+          </div>
+          <div class="text-sm">
+            <% if ok %>
+              <span class="text-green-700">Total is 100% or less</span>
+            <% else %>
+              <span class="text-red-700">Total exceeds 100%</span>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
     <h2 class="text-2xl font-bold mb-6 text-center">
       Upload Categories from YAML file
     </h2>

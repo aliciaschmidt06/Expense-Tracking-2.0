@@ -15,6 +15,19 @@ class CategoryImportsController < ApplicationController
     begin
       yaml_data = YAML.safe_load(config_file.read)
 
+      # Compute summed total percentage from uploaded YAML. Treat missing values as 0.
+      total_percentage = 0.0
+      if yaml_data["categories"].present?
+        yaml_data["categories"].each do |_name, details|
+          next unless details.is_a?(Hash)
+          total_percentage += (details["target_percentage"] || 0).to_f
+        end
+      end
+
+      # Provide the total to the next page via flash so the `new` view can display it.
+      flash[:import_total] = total_percentage
+      flash[:import_total_ok] = (total_percentage <= 100.0)
+
       if yaml_data["categories"].present?
         yaml_data["categories"].each do |name, details|
           category = Category.find_or_initialize_by(name: name)

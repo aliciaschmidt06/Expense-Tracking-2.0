@@ -7,3 +7,13 @@
 #   ["Action", "Comedy", "Drama", "Horror"].each do |genre_name|
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
+
+# db/seeds.rb
+ignore_category = Category.find_or_create_by!(name: "Ignore") do |cat|
+  cat.keywords = ["ignore"]
+  cat.target_percentage = nil
+end
+
+# Ensure keywords is an array if the record already existed
+ignore_category.keywords = ["ignore"] unless ignore_category.keywords.is_a?(Array)
+ignore_category.save!

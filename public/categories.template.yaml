@@ -25,3 +25,6 @@ categories:
       - wealthsimple
       - quest trade
     target_percentage: 10
+  ignore:
+    keywords: 
+      - THANK YOU
