@@ -1,5 +1,6 @@
 class TransactionsController < ApplicationController
   before_action :set_transaction, only: %i[ show edit update destroy ]
+  before_action :set_transaction, only: %i[ assign_category ], if: -> { params[:id].present? }
   before_action :load_categories, only: %i[ new edit create update ]
 
   # GET /transactions or /transactions.json
@@ -43,6 +44,45 @@ class TransactionsController < ApplicationController
 
     # Count results for the view (after filters applied)
     @results_count = @transactions.count
+  end
+
+  # GET /uncategorized
+  def uncategorized
+    @unknown = Category.find_or_create_by!(name: "Unknown")
+    @transactions = Transaction.where(category: @unknown).includes(:category)
+    @categories = Category.where.not(id: @unknown.id).order(:name)
+  end
+
+  # PATCH /transactions/:id/assign_category
+  # Expects { category_id: <id> } via JSON; returns JSON
+  def assign_category
+    set_transaction if @transaction.nil? && params[:id].present?
+    category = Category.find(params[:category_id])
+
+    ActiveRecord::Base.transaction do
+      @transaction.update!(category: category)
+
+      # Add transaction name to category keywords if not present
+      kws = category.keyword_list
+      name = @transaction.name.to_s.strip
+      unless name.blank? || kws.map(&:downcase).include?(name.downcase)
+        kws << name
+        category.update!(keywords: kws)
+      end
+    end
+
+    # After updating the category and its keywords, callbacks may have reassigned
+    # other transactions that match the new keywords. Render the updated
+    # uncategorized list HTML so the client can refresh that pane.
+    unknown = Category.find_by(name: "Unknown")
+    remaining = unknown ? Transaction.where(category: unknown).includes(:category) : Transaction.none
+    remaining_html = render_to_string(partial: 'transactions/uncategorized_list', locals: { transactions: remaining })
+
+    render json: { success: true, transaction_id: @transaction.id, category_name: category.name, remaining_html: remaining_html }
+  rescue ActiveRecord::RecordNotFound => e
+    render json: { success: false, error: e.message }, status: :not_found
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { success: false, error: e.message }, status: :unprocessable_entity
   end
 
   # GET /transactions/1 or /transactions/1.json

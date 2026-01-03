@@ -1,0 +1,15 @@
+<%# Partial: list of uncategorized transactions (used by AJAX refresh) %>
+<% transactions.each do |t| %>
+  <div class="p-4 rounded-lg border border-gray-200 bg-gray-50 draggable-transaction" draggable="true" data-transaction-id="<%= t.id %>">
+    <div class="flex justify-between items-start">
+      <div>
+        <div class="text-sm text-gray-500"><%= t.account_name %></div>
+        <div class="font-medium text-gray-900"><%= t.name %></div>
+      </div>
+      <div class="text-right">
+        <div class="font-semibold">$<%= number_with_precision(t.amount || 0, precision: 2) %></div>
+        <div class="text-xs text-gray-500"><%= l(t.created_at, format: :short) if t.created_at %></div>
+      </div>
+    </div>
+  </div>
+<% end %>

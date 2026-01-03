@@ -5,6 +5,30 @@
     </h1>
   </header>
 
+  <!-- Data availability banner placed under the title -->
+  <div class="px-12 mt-4">
+    <div class="w-full max-w-5xl mx-auto">
+      <% if @data_available %>
+        <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+          <div class="text-sm text-gray-700">
+            Data Available: <span class="font-semibold"><%= @range_start.strftime('%b %-d, %Y') %></span> - <span class="font-semibold"><%= @range_end.strftime('%b %-d, %Y') %></span>
+          </div>
+          <div>
+            <% if @stale_days && @stale_days > 0 %>
+              <span class="text-sm text-yellow-800 bg-yellow-100 px-3 py-1 rounded-full">Data is <%= pluralize(@stale_days, 'day') %> stale - please upload more expenses!</span>
+            <% else %>
+              <span class="text-sm text-green-800 bg-green-100 px-3 py-1 rounded-full">Up-to-date!</span>
+            <% end %>
+          </div>
+        </div>
+      <% else %>
+        <div class="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+          <div class="text-sm text-yellow-700">No transaction data available - Please upload transactions!</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
   <main class="flex-1 flex items-center justify-center">
     <div class="w-full max-w-5xl px-12 space-y-6 text-center">
 
@@ -17,6 +41,11 @@
             categories_path,
             class: "block w-full bg-blue-50 text-blue-700 py-4 rounded-xl font-medium shadow-sm
                     hover:bg-blue-100 transition" %>
+
+      <%= link_to "Show uncategorized transactions",
+        uncategorized_transactions_path,
+        class: "block w-full bg-blue-50 text-blue-700 py-4 rounded-xl font-medium shadow-sm
+            hover:bg-blue-100 transition" %>
 
     </div>
   </main>

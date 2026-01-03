@@ -1,0 +1,120 @@
+<% content_for :title, "Uncategorized Transactions" %>
+
+<div class="min-h-screen w-full bg-gray-50 px-12 py-10">
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-2xl font-semibold mb-6">Uncategorized Transactions</h1>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Left: transactions list -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h2 class="text-lg font-medium mb-4">Unknown category transactions</h2>
+        <div id="uncategorized-list" class="space-y-3">
+          <%= render partial: 'transactions/uncategorized_list', locals: { transactions: @transactions } %>
+        </div>
+      </div>
+
+      <!-- Right: categories (drop targets) -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h2 class="text-lg font-medium mb-4">Categories (drop here)</h2>
+        <div id="categories-dropzone" class="space-y-3">
+          <% @categories.each do |c| %>
+            <div class="p-4 rounded-lg border border-gray-200 bg-white category-dropzone" data-category-id="<%= c.id %>">
+              <div class="flex justify-between items-center">
+                <div>
+                  <div class="font-medium text-gray-900"><%= c.name %></div>
+                  <div class="text-xs text-gray-500"><%= Array(c.keywords).join(', ') %></div>
+                </div>
+                <div class="text-sm text-gray-500">Drop here</div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+
+      let draggedId = null
+
+      function attachDragHandlers() {
+        // remove existing listeners by cloning nodes (simple way to reset)
+        document.querySelectorAll('.draggable-transaction').forEach(el => {
+          // ensure we don't attach duplicate listeners: replace node with clone
+          const clone = el.cloneNode(true)
+          el.parentNode.replaceChild(clone, el)
+        })
+
+        document.querySelectorAll('.draggable-transaction').forEach(el => {
+          el.addEventListener('dragstart', e => {
+            draggedId = el.dataset.transactionId
+            el.classList.add('opacity-60')
+            e.dataTransfer.effectAllowed = 'move'
+          })
+          el.addEventListener('dragend', e => {
+            el.classList.remove('opacity-60')
+            draggedId = null
+          })
+        })
+      }
+
+      attachDragHandlers()
+
+      document.querySelectorAll('.category-dropzone').forEach(zone => {
+        zone.addEventListener('dragover', e => {
+          e.preventDefault()
+          zone.classList.add('bg-green-50')
+        })
+        zone.addEventListener('dragleave', e => {
+          zone.classList.remove('bg-green-50')
+        })
+        zone.addEventListener('drop', async e => {
+          e.preventDefault()
+          zone.classList.remove('bg-green-50')
+          const categoryId = zone.dataset.categoryId
+          const transactionId = draggedId
+          if (!transactionId) return
+
+          try {
+            const res = await fetch(`/transactions/${transactionId}/assign_category`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrf,
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({ category_id: categoryId })
+            })
+            const body = await res.json()
+            if (res.ok && body.success) {
+              // replace left list with returned HTML so other matching transactions
+              // that were assigned server-side also disappear
+              if (body.remaining_html !== undefined) {
+                const list = document.getElementById('uncategorized-list')
+                if (list) {
+                  list.innerHTML = body.remaining_html
+                  attachDragHandlers()
+                }
+              } else {
+                // fallback: remove only the dragged element
+                const txEl = document.querySelector('.draggable-transaction[data-transaction-id="' + transactionId + '"]')
+                if (txEl) txEl.remove()
+              }
+
+              // optionally flash a small success indicator
+              zone.classList.add('ring-2','ring-green-300')
+              setTimeout(()=> zone.classList.remove('ring-2','ring-green-300'), 900)
+            } else {
+              alert('Failed to assign category: ' + (body.error || res.statusText))
+            }
+          } catch (err) {
+            console.error(err)
+            alert('Network error while assigning category')
+          }
+        })
+      })
+    })()
+  </script>
+</div>

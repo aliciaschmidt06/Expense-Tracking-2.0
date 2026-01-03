@@ -2,9 +2,14 @@ Rails.application.routes.draw do
   get "category_imports/new"
   get "category_imports/create"
   root "home#index"
-  resources :transactions
+  resources :transactions do
+    patch :assign_category, on: :member
+  end
   # Export categories YAML for download
   get 'categories/download_yaml', to: 'categories#download_yaml', as: 'download_categories_yaml'
+  # Show uncategorized transactions (Unknown category)
+  get 'uncategorized', to: 'transactions#uncategorized', as: 'uncategorized_transactions'
+
   resources :categories
   
   resource :import, only: [:new] do
