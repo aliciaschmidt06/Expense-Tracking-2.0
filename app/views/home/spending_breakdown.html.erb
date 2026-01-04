@@ -1,6 +1,9 @@
 <div class="min-h-screen w-full bg-white flex flex-col">
-  <header class="px-12 py-6 border-b">
+  <header class="px-12 py-6 border-b flex items-center justify-between">
     <h1 class="text-2xl font-semibold text-gray-900">Spending Breakdown</h1>
+    <div>
+      <button id="export-spending-plan" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Export CSV</button>
+    </div>
   </header>
 
   <main class="flex-1">
@@ -91,6 +94,9 @@
             card.setAttribute('tabindex', '0')
             card.dataset.categoryId = cat.id
             card.dataset.categoryName = cat.name
+            card.dataset.actualPercentage = (cat.actual_percentage || 0)
+            card.dataset.targetPercentage = (cat.target_percentage || 0)
+            card.dataset.isInvestment = ((cat.name || '').toLowerCase().includes('invest')) ? '1' : '0'
             breakdownContainer.appendChild(card)
           })
 
@@ -115,6 +121,20 @@
             console.log('card activated', card.dataset.categoryId)
             const catId = card.dataset.categoryId
             const catName = card.dataset.categoryName || 'Category'
+            // color transactions title same as card logic
+            const actual = parseFloat(card.dataset.actualPercentage || 0)
+            const target = parseFloat(card.dataset.targetPercentage || 0)
+            const isInvestment = card.dataset.isInvestment === '1'
+            let over = actual > target
+            if (isInvestment) { over = actual < target }
+            const titleEl = document.getElementById('transactions-title')
+            // clear previous color classes
+            titleEl.classList.remove('bg-red-50','text-red-700','bg-green-50','text-green-700','px-2','py-1','rounded')
+            if (over) {
+              titleEl.classList.add('bg-red-50','text-red-700','px-2','py-1','rounded')
+            } else {
+              titleEl.classList.add('bg-green-50','text-green-700','px-2','py-1','rounded')
+            }
             const txUrl = '<%= dashboard_category_transactions_path %>.json?' + formatParams({ category_id: catId, start_date: document.getElementById('filter-start').value, end_date: document.getElementById('filter-end').value })
             try {
               const r = await fetch(txUrl)
@@ -196,6 +216,16 @@
         activePeriod = 'btn-so-far-year'
         setActiveButton(activePeriod)
         fetchBreakdown()
+      })
+
+      // export CSV using current filters
+      document.getElementById('export-spending-plan').addEventListener('click', (e) => {
+        const start = document.getElementById('filter-start').value
+        const end = document.getElementById('filter-end').value
+        const params = formatParams({ start_date: start, end_date: end, include_zero: '1' })
+        const url = '<%= spending_breakdown_export_path %>.csv?' + params
+        // open in new tab to trigger download
+        window.open(url, '_blank')
       })
 
       // Note: Close button removed; no-op if not present

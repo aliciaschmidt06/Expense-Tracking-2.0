@@ -185,4 +185,69 @@ class HomeController < ApplicationController
 
     render json: { transactions: txs }
   end
+
+  # GET /spending_breakdown/export.csv
+  def spending_breakdown_export
+    # parse dates safely
+    start_date = nil
+    if params[:start_date].present?
+      begin
+        start_date = Date.parse(params[:start_date])
+      rescue ArgumentError, TypeError
+        start_date = nil
+      end
+    end
+
+    end_date = nil
+    if params[:end_date].present?
+      begin
+        end_date = Date.parse(params[:end_date])
+      rescue ArgumentError, TypeError
+        end_date = nil
+      end
+    end
+
+    # sensible defaults: last 12 months
+    if start_date.nil? || end_date.nil?
+      end_date ||= Date.current
+      start_date ||= (end_date << 11).beginning_of_month.to_date
+    end
+
+    period_scope = Transaction.all
+    period_scope = period_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
+    period_scope = period_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
+
+    total_sum = period_scope.sum(:amount).to_f
+
+    include_zero = params[:include_zero].present?
+    categories_scope = include_zero ? Category.order(:name) : Category.where.not(target_percentage: nil).where('target_percentage > 0').order(:name)
+
+    require 'csv'
+    csv = CSV.generate(headers: false) do |csv|
+      csv << ["Spending Plan"]
+      # print statement date or period
+      if start_date && end_date && start_date.month == end_date.month && start_date.year == end_date.year
+        csv << ["Statement date: #{start_date.strftime('%B %Y')}"]
+      else
+        csv << ["Period: #{start_date.strftime('%Y-%m-%d')} to #{end_date.strftime('%Y-%m-%d')}"]
+      end
+      csv << []
+
+      categories_scope.each do |c|
+        c_sum = period_scope.where(category_id: c.id).sum(:amount).to_f
+        actual_pct = total_sum > 0 ? (c_sum / total_sum * 100.0) : 0.0
+        target = c.target_percentage.to_f
+        csv << ["#{c.name}: Target #{target.round(2)}%, Actual #{actual_pct.round(2)}%"]
+        csv << ["Date", "Name", "Account", "Amount"]
+        txs = period_scope.where(category_id: c.id).order(created_at: :desc)
+        txs.each do |t|
+          csv << [t.created_at.to_date.strftime('%Y-%m-%d'), t.name, t.account_name, sprintf('%.2f', t.amount.to_f)]
+        end
+        csv << []
+      end
+    end
+
+    filename = "spending_plan_#{Time.current.strftime('%Y%m%d%H%M%S')}.csv"
+    send_data csv, filename: filename, type: 'text/csv; charset=utf-8'
+  end
 end

@@ -52,10 +52,15 @@ class CategoryImportsController < ApplicationController
       redirect_to categories_path, notice: "Categories imported successfully"
 
     rescue Psych::SyntaxError => e
+      Rails.logger.error("Category import YAML syntax error: #{e.message}")
       redirect_to new_category_import_path, alert: "Invalid YAML file: #{e.message}"
     rescue ActiveRecord::RecordInvalid => e
+      Rails.logger.error("Category import failed saving: #{e.record.inspect} #{e.record.errors.full_messages.join(', ')}")
       redirect_to new_category_import_path,
                   alert: "Failed to save category '#{e.record.name}': #{e.record.errors.full_messages.join(', ')}"
+    rescue StandardError => e
+      Rails.logger.error("Category import unexpected error: #{e.class} #{e.message}\n#{e.backtrace.join("\n")}")
+      redirect_to new_category_import_path, alert: "Import failed: #{e.message}"
     end
   end
 end
