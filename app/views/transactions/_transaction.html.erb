@@ -1,37 +1,52 @@
 <div id="<%= dom_id transaction %>" class="space-y-4">
   <div class="flex items-start justify-between">
     <div>
-      <h2 class="text-2xl font-semibold text-gray-900"><%= transaction.name.presence || "(no name)" %></h2>
-      <p class="text-sm text-gray-500 mt-1"><%= transaction.account_name.presence || "—" %></p>
+      <h2 class="text-2xl font-semibold text-gray-900">
+        <%= transaction.name.presence || "(no name)" %>
+      </h2>
+      <p class="text-sm text-gray-500 mt-1">
+        <%= transaction.account_name.presence || "—" %>
+      </p>
     </div>
 
     <div class="text-right">
-      <p class="text-lg font-semibold text-gray-900">$<%= number_with_precision(transaction.amount || 0, precision: 2) %></p>
-      <p class="text-sm text-gray-500"><%= transaction.transaction_type.to_s.humanize %></p>
+      <p class="text-lg font-semibold text-gray-900">
+        $<%= number_with_precision(transaction.amount || 0, precision: 2) %>
+      </p>
+      <p class="text-sm text-gray-500">
+        <%= transaction.transaction_type.to_s.humanize %>
+      </p>
     </div>
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
     <div class="bg-gray-50 rounded-lg px-4 py-3">
       <p class="text-gray-500">Category</p>
-      <p class="font-medium text-gray-800"><%= transaction.category&.name || "—" %></p>
+      <p class="font-medium text-gray-800">
+        <%= transaction.category&.name || "—" %>
+      </p>
     </div>
 
     <div class="bg-gray-50 rounded-lg px-4 py-3">
       <p class="text-gray-500">Date</p>
-      <p class="font-medium text-gray-800"><%= l(transaction.created_at, format: :long) if transaction.created_at %></p>
+      <p class="font-medium text-gray-800">
+        <%= l(transaction.created_at, format: :long) if transaction.created_at %>
+      </p>
     </div>
 
     <div class="bg-gray-50 rounded-lg px-4 py-3">
       <p class="text-gray-500">To be reimbursed</p>
-      <p class="font-medium text-gray-800"><%= transaction.to_be_reimbursed? ? "Yes" : "No" %></p>
+      <p class="font-medium text-gray-800">
+        <%= transaction.to_be_reimbursed? ? "Yes" : "No" %>
+      </p>
     </div>
   </div>
 
   <% if transaction.respond_to?(:notes) && transaction.notes.present? %>
     <div class="bg-white border border-gray-100 rounded-lg p-4">
-      <p class="text-sm text-gray-600"><%= simple_format(transaction.notes) %></p>
+      <p class="text-sm text-gray-600">
+        <%= simple_format(transaction.notes) %>
+      </p>
     </div>
   <% end %>
-
 </div>

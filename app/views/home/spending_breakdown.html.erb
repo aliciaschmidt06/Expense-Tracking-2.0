@@ -32,6 +32,13 @@
         </div>
 
         <!-- Transactions for selected category (table always visible, empty until a card is clicked) -->
+        <!-- Totals printout (updated by JS) -->
+        <div id="totals-printout" class="mb-4 text-sm text-gray-700">
+          <strong>Total Income: </strong><span id="total-income">$0.00</span>
+          &nbsp; <strong>Total Expenses: </strong><span id="total-expenses">$0.00</span>
+          &nbsp; <strong>Savings: </strong><span id="total-savings">$0.00</span>
+        </div>
+
         <div id="category-transactions" class="bg-white rounded-lg border border-gray-100 p-4 mb-6">
           <div class="flex items-center justify-between mb-3">
             <h3 id="transactions-title" class="text-lg font-medium">Transactions (select a category)</h3>
@@ -72,7 +79,30 @@
         try {
           const res = await fetch(url)
           const body = await res.json()
-          const breakdown = body.breakdown || []
+          let breakdown = body.breakdown || []
+
+          // update totals printout above the transactions table
+          try {
+            const incomeTotal = parseFloat(body.income_total || 0)
+            const totalSum = parseFloat(body.total_sum || 0)
+            const expenseTotal = Math.max(0, totalSum - incomeTotal)
+            const savings = incomeTotal - expenseTotal
+            const elIncome = document.getElementById('total-income')
+            const elExpenses = document.getElementById('total-expenses')
+            const elSavings = document.getElementById('total-savings')
+            if (elIncome) elIncome.textContent = `$${incomeTotal.toFixed(2)}`
+            if (elExpenses) elExpenses.textContent = `$${expenseTotal.toFixed(2)}`
+            if (elSavings) elSavings.textContent = `$${savings.toFixed(2)}`
+          } catch (e) { /* ignore */ }
+
+          // Ensure Income card (if present) is rendered first (top-left)
+          breakdown.sort((a, b) => {
+            const an = (a.name || '').toString().toLowerCase() === 'income'
+            const bn = (b.name || '').toString().toLowerCase() === 'income'
+            if (an && !bn) return -1
+            if (bn && !an) return 1
+            return 0
+          })
 
           const breakdownContainer = document.getElementById('category-breakdown')
           breakdownContainer.innerHTML = ''
@@ -81,23 +111,40 @@
             // investments are treated inversely: being under target is 'bad'
             const name = (cat.name || '').toLowerCase()
             const isInvestment = name.includes('invest')
+            const isIncome = name === 'income'
             const actual = parseFloat(cat.actual_percentage || 0)
             const target = parseFloat(cat.target_percentage || 0)
-            let over = actual > target
-            if (isInvestment) {
-              over = actual < target
+
+            // Render Income as a neutral grey card and do not apply red/green highlighting
+            if (isIncome) {
+              card.className = 'p-6 h-36 rounded-lg border flex flex-col justify-between bg-gray-200 border-gray-300 select-none'
+              card.innerHTML = `\n                <div class="text-lg font-semibold text-gray-900">${cat.name}</div>\n                <div class="flex items-center justify-between">\n                  <div class="text-sm text-gray-700">Total $${(parseFloat(cat.sum) || 0).toFixed(2)}</div>\n                  <div class="text-sm text-gray-500">Income</div>\n                </div>\n              `
+              card.dataset.categoryId = cat.id
+              card.dataset.categoryName = cat.name
+              card.dataset.actualPercentage = (cat.actual_percentage || 0)
+              card.dataset.targetPercentage = (cat.target_percentage || 0)
+              card.dataset.isInvestment = isInvestment ? '1' : '0'
+              card.dataset.isIncome = '1'
+              card.setAttribute('role', 'button')
+              card.setAttribute('tabindex', '0')
+              breakdownContainer.appendChild(card)
+            } else {
+              // For investments we invert the meaning of over/under
+              let over = actual > target
+              if (isInvestment) { over = actual < target }
+              card.className = 'p-6 h-36 rounded-lg border flex flex-col justify-between transition transform hover:-translate-y-1 hover:shadow-md cursor-pointer ' + (over ? 'border-red-300 bg-red-50 hover:bg-red-100' : 'border-green-300 bg-green-50 hover:bg-green-100')
+              card.innerHTML = `\n                <div class="text-lg font-semibold text-gray-900">${cat.name}</div>\n                <div class="flex items-center justify-between">\n                  <div class="text-sm text-gray-700">Actual ${actual.toFixed(1)}%</div>\n                  <div class="text-sm text-gray-700">Target ${target.toFixed(1)}%</div>\n                </div>\n              `
+              // accessibility: make card focusable and role=button
+              card.setAttribute('role', 'button')
+              card.setAttribute('tabindex', '0')
+              card.dataset.categoryId = cat.id
+              card.dataset.categoryName = cat.name
+              card.dataset.actualPercentage = (cat.actual_percentage || 0)
+              card.dataset.targetPercentage = (cat.target_percentage || 0)
+              card.dataset.isInvestment = isInvestment ? '1' : '0'
+              card.dataset.isIncome = '0'
+              breakdownContainer.appendChild(card)
             }
-            card.className = 'p-6 h-36 rounded-lg border flex flex-col justify-between transition transform hover:-translate-y-1 hover:shadow-md cursor-pointer ' + (over ? 'border-red-300 bg-red-50 hover:bg-red-100' : 'border-green-300 bg-green-50 hover:bg-green-100')
-            card.innerHTML = `\n              <div class="text-lg font-semibold text-gray-900">${cat.name}</div>\n              <div class="flex items-center justify-between">\n                <div class="text-sm text-gray-700">Actual ${actual.toFixed(1)}%</div>\n                <div class="text-sm text-gray-700">Target ${target.toFixed(1)}%</div>\n              </div>\n            `
-            // accessibility: make card focusable and role=button
-            card.setAttribute('role', 'button')
-            card.setAttribute('tabindex', '0')
-            card.dataset.categoryId = cat.id
-            card.dataset.categoryName = cat.name
-            card.dataset.actualPercentage = (cat.actual_percentage || 0)
-            card.dataset.targetPercentage = (cat.target_percentage || 0)
-            card.dataset.isInvestment = ((cat.name || '').toLowerCase().includes('invest')) ? '1' : '0'
-            breakdownContainer.appendChild(card)
           })
 
           // Use event delegation for clicks and keyboard activation (attach once)
@@ -125,15 +172,22 @@
             const actual = parseFloat(card.dataset.actualPercentage || 0)
             const target = parseFloat(card.dataset.targetPercentage || 0)
             const isInvestment = card.dataset.isInvestment === '1'
-            let over = actual > target
-            if (isInvestment) { over = actual < target }
+            const isIncome = card.dataset.isIncome === '1' || (card.dataset.categoryName || '').toString().toLowerCase() === 'income'
+            // For Income we do not apply title coloring; use null to indicate no color
+            let over = null
+            if (!isIncome) {
+              if (isInvestment) { over = actual < target }
+              else { over = actual > target }
+            }
             const titleEl = document.getElementById('transactions-title')
             // clear previous color classes
             titleEl.classList.remove('bg-red-50','text-red-700','bg-green-50','text-green-700','px-2','py-1','rounded')
-            if (over) {
-              titleEl.classList.add('bg-red-50','text-red-700','px-2','py-1','rounded')
-            } else {
-              titleEl.classList.add('bg-green-50','text-green-700','px-2','py-1','rounded')
+            if (over !== null) {
+              if (over) {
+                titleEl.classList.add('bg-red-50','text-red-700','px-2','py-1','rounded')
+              } else {
+                titleEl.classList.add('bg-green-50','text-green-700','px-2','py-1','rounded')
+              }
             }
             const txUrl = '<%= dashboard_category_transactions_path %>.json?' + formatParams({ category_id: catId, start_date: document.getElementById('filter-start').value, end_date: document.getElementById('filter-end').value })
             try {
@@ -155,6 +209,10 @@
                 tbody.appendChild(tr)
               })
               document.getElementById('transactions-title').textContent = `Transactions — ${catName}`
+              // If Income card was activated, clear any accidental selection so table text doesn't remain highlighted
+              try {
+                if (isIncome && window.getSelection) window.getSelection().removeAllRanges()
+              } catch (e) { /* ignore */ }
               document.getElementById('category-transactions').scrollIntoView({ behavior: 'smooth', block: 'start' })
             } catch (err) {
               console.error('failed to fetch category transactions', err)

@@ -1,7 +1,6 @@
-<% content_for :title, @transaction.name.presence || "Transaction" %>
+<% content_for :title, (@transaction&.name.presence || "Transaction") %>
 
 <div class="min-h-screen w-full bg-gray-50 px-12 py-10">
-
   <div class="max-w-3xl mx-auto space-y-6">
 
     <% if notice.present? %>
@@ -15,19 +14,18 @@
     </div>
 
     <div class="flex flex-wrap gap-4 mt-4">
-      <%= link_to "Edit Transaction",
-            edit_transaction_path(@transaction),
-            class: "bg-blue-600 text-white px-5 py-2 rounded-lg font-medium shadow-md hover:bg-blue-700 hover:shadow-lg transition" %>
+  <%= link_to "Edit Transaction",
+    edit_transaction_path(@transaction),
+    class: "bg-blue-600 text-white px-5 py-2 rounded-lg font-medium shadow-md hover:bg-blue-700 hover:shadow-lg transition" %>
 
-      <%= link_to "Back to Transactions",
-            transactions_path,
-            class: "bg-gray-100 text-gray-800 px-5 py-2 rounded-lg font-medium hover:bg-gray-200 transition" %>
+  <%= link_to "Back to Transactions",
+    transactions_path,
+    class: "bg-gray-100 text-gray-800 px-5 py-2 rounded-lg font-medium hover:bg-gray-200 transition" %>
 
-      <%= button_to "Destroy Transaction", @transaction, method: :delete,
-            data: { confirm: "Are you sure you want to delete this transaction?" },
-            class: "bg-red-600 text-white px-5 py-2 rounded-lg font-medium shadow-md hover:bg-red-700 hover:shadow-lg transition" %>
+  <%= button_to "Destroy Transaction", @transaction, method: :delete,
+    data: { confirm: "Are you sure you want to delete this transaction?" },
+    class: "bg-red-600 text-white px-5 py-2 rounded-lg font-medium shadow-md hover:bg-red-700 hover:shadow-lg transition" %>
     </div>
 
   </div>
-
 </div>

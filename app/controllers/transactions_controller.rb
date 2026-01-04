@@ -1,6 +1,8 @@
 class TransactionsController < ApplicationController
-  before_action :set_transaction, only: %i[ show edit update destroy ]
-  before_action :set_transaction, only: %i[ assign_category ], if: -> { params[:id].present? }
+  before_action :set_transaction,
+                only: %i[ show edit update destroy assign_category ],
+                if: -> { params[:id].present? }
+
   before_action :load_categories, only: %i[ new edit create update ]
 
   # GET /transactions or /transactions.json
@@ -87,7 +89,9 @@ class TransactionsController < ApplicationController
 
   # GET /transactions/1 or /transactions/1.json
   def show
+    Rails.logger.debug "SHOW ACTION HIT, id=#{params[:id].inspect}"
   end
+
 
   # GET /transactions/new
   def new
@@ -138,8 +142,10 @@ class TransactionsController < ApplicationController
 
   private
     def set_transaction
+      Rails.logger.debug "SET_TRANSACTION id=#{params[:id].inspect}"
       @transaction = Transaction.find(params[:id])
     end
+
 
     def load_categories
       @categories = Category.order(:name)
