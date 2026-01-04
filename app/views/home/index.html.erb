@@ -1,62 +1,73 @@
-<div class="min-h-screen w-full bg-white flex flex-col">
-  <header class="px-12 py-6 border-b">
-    <h1 class="text-2xl font-semibold text-gray-900">
-      Expense Tracker
-    </h1>
-  </header>
-
-  <!-- Data availability banner placed under the title -->
-  <div class="px-12 mt-4">
-    <div class="w-full max-w-5xl mx-auto">
-      <% if @data_available %>
-        <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-          <div class="text-sm text-gray-700">
-            Data Available: <span class="font-semibold"><%= @range_start.strftime('%b %-d, %Y') %></span> - <span class="font-semibold"><%= @range_end.strftime('%b %-d, %Y') %></span>
+<div class="min-h-screen w-full bg-gray-50 flex flex-col">
+  <!-- top navigation rendered in application layout -->
+  
+    <div class="max-w-6xl mx-auto px-6 md:px-12">
+  <!-- Hero -->
+  <section class="bg-white rounded-2xl shadow-md p-8 mt-6 mb-8">
+      <div class="md:flex md:items-center md:justify-between">
+        <div>
+          <h2 class="text-3xl font-extrabold text-gray-900">P, simply visualized</h2>
+          <p class="mt-2 text-gray-600">Quickly see where your money goes and take action — import transactions, categorize, and review spending breakdowns.</p>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <%= link_to "Open Insights", insights_path, class: "inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
+            <%= link_to "Spending Breakdown", spending_breakdown_path, class: "inline-flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100" %>
           </div>
-          <div>
-            <% if @stale_days && @stale_days > 0 %>
-              <span class="text-sm text-yellow-800 bg-yellow-100 px-3 py-1 rounded-full">Data is <%= pluralize(@stale_days, 'day') %> stale - please upload more expenses!</span>
+        </div>
+
+        <div class="mt-6 md:mt-0 md:ml-8 grid grid-cols-2 gap-4">
+          <div class="p-4 bg-gray-50 rounded-lg text-center">
+            <div class="text-sm text-gray-500">Date Range</div>
+            <% if @data_available %>
+              <div class="mt-1 font-semibold text-gray-900"><%= @range_start.strftime('%b %-d, %Y') %> – <%= @range_end.strftime('%b %-d, %Y') %></div>
             <% else %>
-              <span class="text-sm text-green-800 bg-green-100 px-3 py-1 rounded-full">Up-to-date!</span>
+              <div class="mt-1 font-semibold text-gray-900">No data</div>
             <% end %>
           </div>
+          <div class="p-4 bg-gray-50 rounded-lg text-center">
+            <div class="text-sm text-gray-500">Data Status</div>
+            <div class="mt-1">
+              <% if @data_available && @stale_days && @stale_days > 0 %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full bg-yellow-100 text-yellow-800">Stale • <%= pluralize(@stale_days, 'day') %></span>
+              <% elsif @data_available %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full bg-green-50 text-green-700">Up-to-date</span>
+              <% else %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-gray-600">No data</span>
+              <% end %>
+            </div>
+          </div>
         </div>
-      <% else %>
-        <div class="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
-          <div class="text-sm text-yellow-700">No transaction data available - Please upload transactions!</div>
+      </div>
+    </section>
+
+    <!-- Action cards -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <div class="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition">
+        <h3 class="text-lg font-semibold text-gray-900">Transactions</h3>
+        <p class="mt-2 text-sm text-gray-600">Search, filter, and manage your imported transactions.</p>
+        <div class="mt-4">
+          <%= link_to "Open Transactions", transactions_path, class: "text-sm text-blue-600 hover:underline" %>
         </div>
-      <% end %>
-    </div>
+      </div>
+
+      <div class="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition">
+        <h3 class="text-lg font-semibold text-gray-900">Spending Breakdown</h3>
+        <p class="mt-2 text-sm text-gray-600">See targets vs actuals across categories and discover overspending.</p>
+        <div class="mt-4">
+          <%= link_to "View breakdown", spending_breakdown_path, class: "text-sm text-blue-600 hover:underline" %>
+        </div>
+      </div>
+
+      <div class="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition">
+        <h3 class="text-lg font-semibold text-gray-900">Categories & Imports</h3>
+        <p class="mt-2 text-sm text-gray-600">Edit categories, import keywords, or download the YAML template.</p>
+        <div class="mt-4 space-x-2">
+          <%= link_to "Manage categories", categories_path, class: "text-sm text-blue-600 hover:underline" %>
+          <%= link_to "Import categories", new_category_import_path, class: "text-sm text-blue-600 hover:underline" %>
+        </div>
+      </div>
+    </section>
   </div>
-
-  <main class="flex-1 flex items-center justify-center">
-    <div class="w-full max-w-5xl px-12 space-y-6 text-center">
-
-      <%= link_to "Open Insights",
-            insights_path,
-            class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
-                    hover:bg-blue-700 transition" %>
-
-  <%= link_to "Spending Breakdown",
-    spending_breakdown_path,
-    class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
-        hover:bg-blue-700 transition" %>
-
-  <%= link_to "View Transactions",
-    transactions_path,
-    class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
-        hover:bg-blue-700 transition" %>
-
-  <%= link_to "View Categories",
-    categories_path,
-    class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
-        hover:bg-blue-700 transition" %>
-
-  <%= link_to "Show uncategorized transactions",
-    uncategorized_transactions_path,
-    class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
-    hover:bg-blue-700 transition" %>
-
-    </div>
-  </main>
+  <footer class="mt-auto py-6">
+    <div class="max-w-6xl mx-auto px-6 md:px-12 text-sm text-gray-500">Built with ❤️ — Expense Tracking</div>
+  </footer>
 </div>

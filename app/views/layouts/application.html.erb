@@ -21,12 +21,8 @@
 
   <body class="bg-gray-50 min-h-screen">
 
-    <!-- Simple Go Home button -->
-    <div class="px-5 pt-5">
-      <%= link_to "Home", root_path, 
-            class: "inline-block bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md
-                   hover:bg-blue-700 hover:shadow-lg transition font-medium" %>
-    </div>
+    <!-- Shared top navigation -->
+    <%= render 'shared/top_nav' %>
 
     <!-- Page content -->
     <main class="container mx-auto mt-5 px-5">
