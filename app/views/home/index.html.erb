@@ -32,20 +32,30 @@
   <main class="flex-1 flex items-center justify-center">
     <div class="w-full max-w-5xl px-12 space-y-6 text-center">
 
-      <%= link_to "View Transactions",
-            transactions_path,
-            class: "block w-full bg-blue-50 text-blue-700 py-4 rounded-xl font-medium shadow-sm
-                    hover:bg-blue-100 transition" %>
+      <%= link_to "Open Insights",
+            insights_path,
+            class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
+                    hover:bg-blue-700 transition" %>
 
-      <%= link_to "View Categories",
-            categories_path,
-            class: "block w-full bg-blue-50 text-blue-700 py-4 rounded-xl font-medium shadow-sm
-                    hover:bg-blue-100 transition" %>
+  <%= link_to "Spending Breakdown",
+    spending_breakdown_path,
+    class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
+        hover:bg-blue-700 transition" %>
 
-      <%= link_to "Show uncategorized transactions",
-        uncategorized_transactions_path,
-        class: "block w-full bg-blue-50 text-blue-700 py-4 rounded-xl font-medium shadow-sm
-            hover:bg-blue-100 transition" %>
+  <%= link_to "View Transactions",
+    transactions_path,
+    class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
+        hover:bg-blue-700 transition" %>
+
+  <%= link_to "View Categories",
+    categories_path,
+    class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
+        hover:bg-blue-700 transition" %>
+
+  <%= link_to "Show uncategorized transactions",
+    uncategorized_transactions_path,
+    class: "block w-full bg-blue-600 text-white py-4 rounded-xl font-medium shadow-sm
+    hover:bg-blue-700 transition" %>
 
     </div>
   </main>

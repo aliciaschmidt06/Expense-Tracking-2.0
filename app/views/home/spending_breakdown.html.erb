@@ -1,0 +1,209 @@
+<div class="min-h-screen w-full bg-white flex flex-col">
+  <header class="px-12 py-6 border-b">
+    <h1 class="text-2xl font-semibold text-gray-900">Spending Breakdown</h1>
+  </header>
+
+  <main class="flex-1">
+    <section class="p-8 w-full">
+      <div class="max-w-6xl mx-auto">
+        <!-- Filters (same as insights) -->
+        <div class="bg-white rounded-lg border border-gray-100 p-4 mb-4 flex items-center space-x-4">
+          <div class="flex items-center space-x-2">
+            <label class="text-sm text-gray-600">Start</label>
+            <input id="filter-start" type="date" value="<%= @range_start ? @range_start.strftime('%Y-%m-%d') : '' %>" class="border rounded px-2 py-1 text-sm">
+          </div>
+          <div class="flex items-center space-x-2">
+            <label class="text-sm text-gray-600">End</label>
+            <input id="filter-end" type="date" value="<%= @range_end ? @range_end.strftime('%Y-%m-%d') : '' %>" class="border rounded px-2 py-1 text-sm">
+          </div>
+          <div class="ml-auto flex items-center space-x-2">
+            <button id="btn-this-month" class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">This month</button>
+            <button id="btn-last-month" class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">Last month</button>
+            <button id="btn-so-far-year" class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">So far this year</button>
+          </div>
+        </div>
+
+        <!-- Category breakdown -->
+        <div id="category-breakdown" class="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          <%# Filled by JS with cards that show category name and target percentage %>
+        </div>
+
+        <!-- Transactions for selected category (table always visible, empty until a card is clicked) -->
+        <div id="category-transactions" class="bg-white rounded-lg border border-gray-100 p-4 mb-6">
+          <div class="flex items-center justify-between mb-3">
+            <h3 id="transactions-title" class="text-lg font-medium">Transactions (select a category)</h3>
+          </div>
+          <div id="category-transactions-list" class="overflow-x-auto">
+            <table id="category-transactions-table" class="min-w-full text-sm text-left">
+              <thead>
+                <tr class="text-xs text-gray-500 uppercase">
+                  <th class="px-3 py-2">Date</th>
+                  <th class="px-3 py-2">Name</th>
+                  <th class="px-3 py-2">Account</th>
+                  <th class="px-3 py-2 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="px-3 py-6 text-gray-500" colspan="4">No category selected — click a category card above to view transactions.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      function formatParams(params) {
+        return Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&')
+      }
+
+      async function fetchBreakdown() {
+        const start = document.getElementById('filter-start').value
+        const end = document.getElementById('filter-end').value
+    const params = { start_date: start, end_date: end, include_zero: '1' }
+        const url = '<%= dashboard_data_path %>.json?' + formatParams(params)
+        try {
+          const res = await fetch(url)
+          const body = await res.json()
+          const breakdown = body.breakdown || []
+
+          const breakdownContainer = document.getElementById('category-breakdown')
+          breakdownContainer.innerHTML = ''
+          breakdown.forEach(cat => {
+            const card = document.createElement('div')
+            // investments are treated inversely: being under target is 'bad'
+            const name = (cat.name || '').toLowerCase()
+            const isInvestment = name.includes('invest')
+            const actual = parseFloat(cat.actual_percentage || 0)
+            const target = parseFloat(cat.target_percentage || 0)
+            let over = actual > target
+            if (isInvestment) {
+              over = actual < target
+            }
+            card.className = 'p-6 h-36 rounded-lg border flex flex-col justify-between transition transform hover:-translate-y-1 hover:shadow-md cursor-pointer ' + (over ? 'border-red-300 bg-red-50 hover:bg-red-100' : 'border-green-300 bg-green-50 hover:bg-green-100')
+            card.innerHTML = `\n              <div class="text-lg font-semibold text-gray-900">${cat.name}</div>\n              <div class="flex items-center justify-between">\n                <div class="text-sm text-gray-700">Actual ${actual.toFixed(1)}%</div>\n                <div class="text-sm text-gray-700">Target ${target.toFixed(1)}%</div>\n              </div>\n            `
+            // accessibility: make card focusable and role=button
+            card.setAttribute('role', 'button')
+            card.setAttribute('tabindex', '0')
+            card.dataset.categoryId = cat.id
+            card.dataset.categoryName = cat.name
+            breakdownContainer.appendChild(card)
+          })
+
+          // Use event delegation for clicks and keyboard activation (attach once)
+          if (!breakdownContainer.dataset.handlersAttached) {
+            breakdownContainer.addEventListener('click', async (e) => {
+              const card = e.target.closest('[data-category-id]')
+              if (!card) return
+              await handleCardActivation(card)
+            })
+            breakdownContainer.addEventListener('keydown', async (e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return
+              const card = e.target.closest('[data-category-id]')
+              if (!card) return
+              e.preventDefault()
+              await handleCardActivation(card)
+            })
+            breakdownContainer.dataset.handlersAttached = '1'
+          }
+
+          async function handleCardActivation(card) {
+            console.log('card activated', card.dataset.categoryId)
+            const catId = card.dataset.categoryId
+            const catName = card.dataset.categoryName || 'Category'
+            const txUrl = '<%= dashboard_category_transactions_path %>.json?' + formatParams({ category_id: catId, start_date: document.getElementById('filter-start').value, end_date: document.getElementById('filter-end').value })
+            try {
+              const r = await fetch(txUrl)
+              if (!r.ok) throw new Error('Network response was not ok')
+              const j = await r.json()
+              const tbody = document.querySelector('#category-transactions-table tbody')
+              tbody.innerHTML = ''
+              if (!(j.transactions || []).length) {
+                const tr = document.createElement('tr')
+                tr.innerHTML = '<td class="px-3 py-6 text-gray-500" colspan="4">No transactions for this category in the selected range.</td>'
+                tbody.appendChild(tr)
+              }
+              (j.transactions || []).forEach(t => {
+                const tr = document.createElement('tr')
+                tr.className = 'border-t'
+                const date = new Date(t.created_at)
+                tr.innerHTML = `\n                  <td class="px-3 py-2 align-top">${date.toLocaleDateString()}</td>\n                  <td class="px-3 py-2 align-top">${t.name}</td>\n                  <td class="px-3 py-2 align-top">${t.account_name || ''}</td>\n                  <td class="px-3 py-2 text-right font-semibold">$${parseFloat(t.amount).toFixed(2)}</td>\n                `
+                tbody.appendChild(tr)
+              })
+              document.getElementById('transactions-title').textContent = `Transactions — ${catName}`
+              document.getElementById('category-transactions').scrollIntoView({ behavior: 'smooth', block: 'start' })
+            } catch (err) {
+              console.error('failed to fetch category transactions', err)
+              alert('Failed to load transactions for this category. See console for details.')
+            }
+          }
+        } catch (err) {
+          console.error('failed to fetch breakdown', err)
+        }
+      }
+
+      document.getElementById('filter-start').addEventListener('change', fetchBreakdown)
+      document.getElementById('filter-end').addEventListener('change', fetchBreakdown)
+      let activePeriod = null
+      function setActiveButton(id) {
+        ['btn-this-month','btn-last-month','btn-so-far-year'].forEach(b => {
+          const el = document.getElementById(b)
+          if (!el) return
+          if (b === id) {
+            el.classList.add('bg-blue-600','text-white')
+            el.classList.remove('bg-blue-50','text-blue-700')
+          } else {
+            el.classList.remove('bg-blue-600','text-white')
+            el.classList.add('bg-blue-50','text-blue-700')
+          }
+        })
+      }
+
+      document.getElementById('btn-this-month').addEventListener('click', () => {
+        const now = new Date()
+        const y = now.getFullYear()
+        const m = String(now.getMonth()+1).padStart(2,'0')
+        document.getElementById('filter-start').value = `${y}-${m}-01`
+        document.getElementById('filter-end').value = `${y}-${m}-${String(now.getDate()).padStart(2,'0')}`
+        activePeriod = 'btn-this-month'
+        setActiveButton(activePeriod)
+        fetchBreakdown()
+      })
+
+      document.getElementById('btn-last-month').addEventListener('click', () => {
+        const now = new Date()
+        now.setMonth(now.getMonth() - 1)
+        const y = now.getFullYear()
+        const m = String(now.getMonth()+1).padStart(2,'0')
+        const start = `${y}-${m}-01`
+        const endDate = new Date(y, now.getMonth()+1, 0)
+        document.getElementById('filter-start').value = start
+        document.getElementById('filter-end').value = `${y}-${m}-${String(endDate.getDate()).padStart(2,'0')}`
+        activePeriod = 'btn-last-month'
+        setActiveButton(activePeriod)
+        fetchBreakdown()
+      })
+
+      document.getElementById('btn-so-far-year').addEventListener('click', () => {
+        const now = new Date()
+        const y = now.getFullYear()
+        document.getElementById('filter-start').value = `${y}-01-01`
+        document.getElementById('filter-end').value = `${y}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+        activePeriod = 'btn-so-far-year'
+        setActiveButton(activePeriod)
+        fetchBreakdown()
+      })
+
+      // Note: Close button removed; no-op if not present
+      const closeBtn = document.getElementById('close-transactions')
+      if (closeBtn) closeBtn.addEventListener('click', () => document.getElementById('category-transactions').classList.add('hidden'))
+
+      // initial load
+      fetchBreakdown()
+    })()
+  </script>
+</div>

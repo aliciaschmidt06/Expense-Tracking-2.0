@@ -1,0 +1,133 @@
+<div class="min-h-screen w-full bg-white flex flex-col">
+  <header class="px-12 py-6 border-b">
+    <h1 class="text-2xl font-semibold text-gray-900">Insights</h1>
+  </header>
+
+  <main class="flex-1 p-8">
+    <div class="max-w-6xl mx-auto">
+      <!-- Filters -->
+      <div class="bg-white rounded-lg border border-gray-100 p-4 mb-4 flex items-center space-x-4">
+        <div class="flex items-center space-x-2">
+          <label class="text-sm text-gray-600">Start</label>
+          <input id="filter-start" type="date" value="<%= @range_start ? @range_start.strftime('%Y-%m-%d') : '' %>" class="border rounded px-2 py-1 text-sm">
+        </div>
+        <div class="flex items-center space-x-2">
+          <label class="text-sm text-gray-600">End</label>
+          <input id="filter-end" type="date" value="<%= @range_end ? @range_end.strftime('%Y-%m-%d') : '' %>" class="border rounded px-2 py-1 text-sm">
+        </div>
+        <div class="flex items-center space-x-2">
+          <label class="text-sm text-gray-600">Category</label>
+          <select id="filter-category" class="border rounded px-2 py-1 text-sm">
+            <option value="">All</option>
+            <% @categories.each do |c| %>
+              <option value="<%= c.id %>"><%= c.name %></option>
+            <% end %>
+          </select>
+        </div>
+        <div class="ml-auto flex items-center space-x-2">
+          <button id="btn-this-month" class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">This month</button>
+          <button id="btn-last-month" class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">Last month</button>
+          <button id="btn-so-far-year" class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">So far this year</button>
+        </div>
+      </div>
+
+      <!-- Chart card -->
+      <div class="bg-white rounded-lg border border-gray-100 p-6">
+        <h2 class="text-lg font-medium mb-4">Spending per month</h2>
+        <div class="w-full">
+          <canvas id="spendingChart" width="800" height="320"></canvas>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    (function(){
+      const ctx = document.getElementById('spendingChart').getContext('2d')
+      let chart = null
+
+      function formatParams(params) {
+        return Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&')
+      }
+
+      async function fetchAndRender() {
+        const start = document.getElementById('filter-start').value
+        const end = document.getElementById('filter-end').value
+        const category = document.getElementById('filter-category').value
+        const params = { start_date: start, end_date: end }
+        if (category) params.category_id = category
+        const url = '<%= dashboard_data_path %>.json?' + formatParams(params)
+        try {
+          const res = await fetch(url)
+          const body = await res.json()
+          const labels = body.labels || []
+          const totals = body.totals || []
+
+          if (chart) {
+            chart.data.labels = labels
+            chart.data.datasets[0].data = totals
+            chart.update()
+          } else {
+            chart = new Chart(ctx, {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'Spending',
+                  data: totals,
+                  backgroundColor: 'rgba(59,130,246,0.6)'
+                }]
+              },
+              options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+              }
+            })
+          }
+        } catch (err) {
+          console.error('Failed to fetch dashboard data', err)
+        }
+      }
+
+      // attach handlers
+      document.getElementById('filter-start').addEventListener('change', fetchAndRender)
+      document.getElementById('filter-end').addEventListener('change', fetchAndRender)
+      document.getElementById('filter-category').addEventListener('change', fetchAndRender)
+
+      document.getElementById('btn-this-month').addEventListener('click', () => {
+        const now = new Date()
+        const y = now.getFullYear()
+        const m = String(now.getMonth()+1).padStart(2,'0')
+        document.getElementById('filter-start').value = `${y}-${m}-01`
+        document.getElementById('filter-end').value = `${y}-${m}-${String(now.getDate()).padStart(2,'0')}`
+        fetchAndRender()
+      })
+
+      document.getElementById('btn-last-month').addEventListener('click', () => {
+        const now = new Date()
+        now.setMonth(now.getMonth() - 1)
+        const y = now.getFullYear()
+        const m = String(now.getMonth()+1).padStart(2,'0')
+        const start = `${y}-${m}-01`
+        const endDate = new Date(y, now.getMonth()+1, 0)
+        const end = `${y}-${String(endDate.getDate()).padStart(2,'0')}`
+        document.getElementById('filter-start').value = start
+        document.getElementById('filter-end').value = `${y}-${m}-${String(endDate.getDate()).padStart(2,'0')}`
+        fetchAndRender()
+      })
+
+      document.getElementById('btn-so-far-year').addEventListener('click', () => {
+        const now = new Date()
+        const y = now.getFullYear()
+        document.getElementById('filter-start').value = `${y}-01-01`
+        document.getElementById('filter-end').value = `${y}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+        fetchAndRender()
+      })
+
+      // initial render
+      fetchAndRender()
+    })()
+  </script>
+</div>

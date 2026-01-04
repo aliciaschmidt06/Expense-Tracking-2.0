@@ -2,6 +2,10 @@ Rails.application.routes.draw do
   get "category_imports/new"
   get "category_imports/create"
   root "home#index"
+  get 'dashboard_data', to: 'home#dashboard_data', as: 'dashboard_data'
+  get 'dashboard_category_transactions', to: 'home#dashboard_category_transactions', as: 'dashboard_category_transactions'
+  get 'insights', to: 'home#insights', as: 'insights'
+  get 'spending_breakdown', to: 'home#spending_breakdown', as: 'spending_breakdown'
   resources :transactions do
     patch :assign_category, on: :member
   end
