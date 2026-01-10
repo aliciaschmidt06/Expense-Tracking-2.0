@@ -143,9 +143,10 @@ class HomeController < ApplicationController
       cursor = cursor.next_month
     end
 
-    # find special categories (case-insensitive)
-    ignore_cat = Category.where('LOWER(name) = ?', 'ignore').first
-    unknown_cat = Category.where('LOWER(name) = ?', 'unknown').first
+  # find special categories robustly (case-insensitive, trimmed)
+  all_cats = Category.all.to_a
+  ignore_ids = all_cats.select { |c| c.name.to_s.downcase.strip == 'ignore' }.map(&:id)
+  unknown_ids = all_cats.select { |c| c.name.to_s.downcase.strip == 'unknown' }.map(&:id)
 
     income_totals = months.map do |m|
       bucket = txs.select { |t| t.created_at.to_date.beginning_of_month == m && t.transaction_type.to_s == 'income' }
@@ -155,8 +156,8 @@ class HomeController < ApplicationController
     spend_totals = months.map do |m|
       bucket = txs.select { |t|
         t.created_at.to_date.beginning_of_month == m && t.transaction_type.to_s != 'income' &&
-        !(ignore_cat && t.category_id == ignore_cat.id) &&
-        !(unknown_cat && t.category_id == unknown_cat.id)
+        !ignore_ids.include?(t.category_id) &&
+        !unknown_ids.include?(t.category_id)
       }
       bucket.sum { |t| (t.amount || 0).to_f }
     end

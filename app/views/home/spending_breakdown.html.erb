@@ -38,11 +38,7 @@
           <!-- Filled by JS: grouped categories with transactions under each -->
           <div id="grouped-container" class="w-full"></div>
         </div>
-        <% if defined?(@unknown_transactions_count) && @unknown_transactions_count.to_i > 0 %>
-          <div class="mt-4 flex justify-center">
-            <%= link_to "Review uncategorized transactions (#{@unknown_transactions_count})", uncategorized_transactions_path, class: "inline-flex items-center justify-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600" %>
-          </div>
-        <% end %>
+        
       </div>
     </section>
   </main>
