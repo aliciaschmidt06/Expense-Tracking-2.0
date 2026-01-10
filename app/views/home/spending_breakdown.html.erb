@@ -50,6 +50,7 @@
                   <th class="px-3 py-2">Date</th>
                   <th class="px-3 py-2">Name</th>
                   <th class="px-3 py-2">Account</th>
+                  <th class="px-3 py-2">Type</th>
                   <th class="px-3 py-2 text-right">Amount</th>
                 </tr>
               </thead>
@@ -105,11 +106,17 @@
           })
 
           const breakdownContainer = document.getElementById('category-breakdown')
+          function titleCase(s) {
+            if (!s) return ''
+            return s.toString().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+          }
           breakdownContainer.innerHTML = ''
           breakdown.forEach(cat => {
             const card = document.createElement('div')
             // investments are treated inversely: being under target is 'bad'
-            const name = (cat.name || '').toLowerCase()
+            const rawName = (cat.name || '')
+            const name = rawName.toLowerCase()
+            const displayName = titleCase(rawName)
             const isInvestment = name.includes('invest')
             const isIncome = name === 'income'
             const actual = parseFloat(cat.actual_percentage || 0)
@@ -118,7 +125,7 @@
             // Render Income as a neutral grey card and do not apply red/green highlighting
             if (isIncome) {
               card.className = 'p-6 h-36 rounded-lg border flex flex-col justify-between bg-gray-200 border-gray-300 select-none'
-              card.innerHTML = `\n                <div class="text-lg font-semibold text-gray-900">${cat.name}</div>\n                <div class="flex items-center justify-between">\n                  <div class="text-sm text-gray-700">Total $${(parseFloat(cat.sum) || 0).toFixed(2)}</div>\n                  <div class="text-sm text-gray-500">Income</div>\n                </div>\n              `
+              card.innerHTML = `\n                <div class="text-lg font-semibold text-gray-900">${displayName}</div>\n                <div class="flex items-center justify-between">\n                  <div class="text-sm text-gray-700">Total $${(parseFloat(cat.sum) || 0).toFixed(2)}</div>\n                  <div class="text-sm text-gray-500">Income</div>\n                </div>\n                <p class="mt-2 text-xs text-gray-600">This number represents how much money you've made, based on the income/employer keywords in your Income category definition. This represents your paychecks.</p>\n              `
               card.dataset.categoryId = cat.id
               card.dataset.categoryName = cat.name
               card.dataset.actualPercentage = (cat.actual_percentage || 0)
@@ -133,12 +140,12 @@
               let over = actual > target
               if (isInvestment) { over = actual < target }
               card.className = 'p-6 h-36 rounded-lg border flex flex-col justify-between transition transform hover:-translate-y-1 hover:shadow-md cursor-pointer ' + (over ? 'border-red-300 bg-red-50 hover:bg-red-100' : 'border-green-300 bg-green-50 hover:bg-green-100')
-              card.innerHTML = `\n                <div class="text-lg font-semibold text-gray-900">${cat.name}</div>\n                <div class="flex items-center justify-between">\n                  <div class="text-sm text-gray-700">Actual ${actual.toFixed(1)}%</div>\n                  <div class="text-sm text-gray-700">Target ${target.toFixed(1)}%</div>\n                </div>\n              `
+              card.innerHTML = `\n                <div class="text-lg font-semibold text-gray-900">${displayName}</div>\n                <div class="flex items-center justify-between">\n                  <div class="text-sm text-gray-700">Actual ${actual.toFixed(1)}%</div>\n                  <div class="text-sm text-gray-700">Target ${target.toFixed(1)}%</div>\n                </div>\n              `
               // accessibility: make card focusable and role=button
               card.setAttribute('role', 'button')
               card.setAttribute('tabindex', '0')
               card.dataset.categoryId = cat.id
-              card.dataset.categoryName = cat.name
+              card.dataset.categoryName = displayName
               card.dataset.actualPercentage = (cat.actual_percentage || 0)
               card.dataset.targetPercentage = (cat.target_percentage || 0)
               card.dataset.isInvestment = isInvestment ? '1' : '0'
@@ -205,7 +212,7 @@
                 const tr = document.createElement('tr')
                 tr.className = 'border-t'
                 const date = new Date(t.created_at)
-                tr.innerHTML = `\n                  <td class="px-3 py-2 align-top">${date.toLocaleDateString()}</td>\n                  <td class="px-3 py-2 align-top">${t.name}</td>\n                  <td class="px-3 py-2 align-top">${t.account_name || ''}</td>\n                  <td class="px-3 py-2 text-right font-semibold">$${parseFloat(t.amount).toFixed(2)}</td>\n                `
+                tr.innerHTML = `\n                  <td class="px-3 py-2 align-top">${date.toLocaleDateString()}</td>\n                  <td class="px-3 py-2 align-top">${t.name}</td>\n                  <td class="px-3 py-2 align-top">${t.account_name || ''}</td>\n                  <td class="px-3 py-2 align-top">${t.transaction_type ? (t.transaction_type === 'income' ? '<span class="inline-flex items-center px-2 py-1 rounded bg-green-50 text-green-700 text-xs">Income</span>' : '<span class="inline-flex items-center px-2 py-1 rounded bg-red-50 text-red-700 text-xs">Expense</span>') : ''}</td>\n                  <td class="px-3 py-2 text-right font-semibold">$${parseFloat(t.amount).toFixed(2)}</td>\n                `
                 tbody.appendChild(tr)
               })
               document.getElementById('transactions-title').textContent = `Transactions — ${catName}`

@@ -9,7 +9,6 @@ class HomeController < ApplicationController
       @range_start = first_ts.to_date
       @range_end = last_ts.to_date
 
-      # how many days stale is the data relative to today
       @stale_days = (Date.current - @range_end).to_i
       @stale_days = 0 if @stale_days.negative?
     else
@@ -102,7 +101,6 @@ class HomeController < ApplicationController
 
     # load and group in Ruby (DB-agnostic)
     txs = scope.select(:amount, :created_at).to_a
-    # build month buckets from start_date to end_date
     months = []
     cursor = start_date.beginning_of_month
     end_month = end_date.beginning_of_month
@@ -118,11 +116,14 @@ class HomeController < ApplicationController
 
     labels = months.map { |m| m.strftime('%b %Y') }
 
-    # build category breakdown for the selected period (ignoring category_id filter)
     period_scope = Transaction.all
     period_scope = period_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
     period_scope = period_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
+    ignore = Category.find_by(name: 'Ignore')
+    period_scope = period_scope.where.not(category_id: ignore.id) if ignore.present?
+
     total_sum = period_scope.sum(:amount).to_f
+    income_total = period_scope.where(transaction_type: Transaction.transaction_types[:income]).sum(:amount).to_f
 
     if params[:include_zero].present?
       categories_scope = Category.order(:name)
@@ -142,7 +143,7 @@ class HomeController < ApplicationController
       }
     end
 
-    render json: { labels: labels, totals: totals, breakdown: categories, total_sum: total_sum.round(2) }
+    render json: { labels: labels, totals: totals, breakdown: categories, total_sum: total_sum.round(2), income_total: income_total.round(2) }
   end
 
   # GET /dashboard_category_transactions.json
@@ -178,6 +179,7 @@ class HomeController < ApplicationController
         id: t.id,
         name: t.name,
         amount: t.amount.to_f,
+        transaction_type: t.transaction_type,
         account_name: t.account_name,
         created_at: t.created_at
       }
