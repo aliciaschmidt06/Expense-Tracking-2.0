@@ -2,7 +2,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["input", "area", "filename", "configInput", "configArea", "configFilename"]
+  static targets = ["input", "area", "filename", "configInput", "configArea", "configFilename", "account"]
 
   connect() {
     // CSV area may not exist
@@ -54,7 +54,20 @@ export default class extends Controller {
 
   updateFilename() {
     if (this.inputTarget.files.length > 0) {
-      this.filenameTarget.textContent = `Selected file: ${this.inputTarget.files[0].name}`
+      const fname = this.inputTarget.files[0].name
+      this.filenameTarget.textContent = `Selected file: ${fname}`
+      // Auto-populate account name from filename (strip extension) if the field is empty
+      try {
+        if (this.hasAccountTarget) {
+          const base = fname.replace(/\.[^/.]+$/, '') // remove extension
+          if (!this.accountTarget.value || this.accountTarget.value.trim() === '') {
+            // replace underscores/dashes with spaces and trim
+            this.accountTarget.value = base.replace(/[_\-]+/g, ' ').trim()
+          }
+        }
+      } catch (e) {
+        // non-fatal
+      }
     } else {
       this.filenameTarget.textContent = ""
     }
