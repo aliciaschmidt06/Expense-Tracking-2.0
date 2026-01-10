@@ -87,6 +87,18 @@
           }
         }
 
+        // year-only like "2025" or "25" -> whole year
+        if (m === null) {
+          const yOnly = s.match(/^(\d{2,4})$/)
+          if (yOnly) {
+            let yy = parseInt(yOnly[1], 10)
+            if (yy < 100) yy = 2000 + yy
+            const startStr = `${yy}-01-01`
+            const endStr = `${yy}-12-31`
+            return { start: startStr, end: endStr }
+          }
+        }
+
         if (m === null || !y) return null
 
         // two-digit year heuristic -> map to 2000-2099

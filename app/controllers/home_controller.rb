@@ -71,6 +71,45 @@ class HomeController < ApplicationController
     end
 
     @categories = Category.order(:name)
+
+    # Prepare quick insights:
+    # special categories to exclude from expense lists (Ignore/Unknown)
+    special_ids = Category.where("LOWER(TRIM(name)) IN (?)", ['ignore', 'unknown']).pluck(:id)
+
+    # Subscriptions: consider transactions grouped by normalized name + account_name + amount (same price)
+    # Exclude Ignore/Unknown (special_ids) from subscription detection
+    subs_query = Transaction.where.not(name: [nil, ''])
+                    .where.not(category_id: special_ids)
+                    .select("LOWER(TRIM(name)) as norm_name, COALESCE(account_name,'') as account_name, ROUND(amount,2) as amt, COUNT(*) as cnt, AVG(amount) as avg_amount, MAX(created_at) as last_at")
+                    .group("LOWER(TRIM(name))", "COALESCE(account_name,'')", "ROUND(amount,2)")
+                    .having("COUNT(*) >= 3")
+                    .order('last_at DESC')
+                    .limit(50)
+
+    @subscriptions = subs_query.map do |s|
+      {
+        name: s.norm_name.to_s, # normalized name
+        account_name: s.account_name.to_s,
+        count: s.cnt.to_i,
+        amount: s.amt.to_f.round(2),
+        avg_amount: s.avg_amount.to_f.round(2),
+        last_at: s.last_at
+      }
+    end
+
+    # Top 20 largest expenses (exclude Ignore/Unknown categories by default)
+    expenses_scope = Transaction.where(transaction_type: Transaction.transaction_types[:expense])
+    expenses_scope = expenses_scope.where.not(category_id: special_ids) if special_ids.any?
+    @top_expenses = expenses_scope.order(amount: :desc).limit(20).map do |t|
+      {
+        id: t.id,
+        name: t.name,
+        account_name: t.account_name,
+        amount: t.amount.to_f.round(2),
+        category: t.category&.name,
+        created_at: t.created_at
+      }
+    end
   end
 
   # GET /spending_breakdown
@@ -198,7 +237,46 @@ class HomeController < ApplicationController
       }
     end
 
-    render json: { labels: labels, income: income_totals, spend: spend_totals, breakdown: categories, total_sum: total_sum.round(2), income_total: income_total.round(2) }
+    # Subscriptions & Top expenses for the current filters (so the front-end can update tiles)
+    subs_scope = scope
+    subs_scope = subs_scope.where.not(category_id: special_ids) if special_ids.any?
+    subs_scope = subs_scope.where.not(name: [nil, ''])
+    subs_query = subs_scope.select("LOWER(TRIM(name)) as norm_name, COALESCE(account_name,'') as account_name, ROUND(amount,2) as amt, COUNT(*) as cnt, AVG(amount) as avg_amount, MAX(created_at) as last_at").group("LOWER(TRIM(name))", "COALESCE(account_name,'')", "ROUND(amount,2)").having("COUNT(*) >= 3").order('last_at DESC').limit(50)
+
+    subscriptions = subs_query.map do |s|
+      {
+        name: s.norm_name.to_s,
+        account_name: s.account_name.to_s,
+        count: s.cnt.to_i,
+        amount: s.amt.to_f.round(2),
+        avg_amount: s.avg_amount.to_f.round(2),
+        last_at: s.last_at
+      }
+    end
+
+    top_scope = scope.where(transaction_type: Transaction.transaction_types[:expense])
+    top_scope = top_scope.where.not(category_id: special_ids) if special_ids.any?
+    top_expenses = top_scope.order(amount: :desc).limit(20).map do |t|
+      {
+        id: t.id,
+        name: t.name,
+        account_name: t.account_name,
+        amount: t.amount.to_f.round(2),
+        category: t.category&.name,
+        created_at: t.created_at
+      }
+    end
+
+    render json: {
+      labels: labels,
+      income: income_totals,
+      spend: spend_totals,
+      breakdown: categories,
+      total_sum: total_sum.round(2),
+      income_total: income_total.round(2),
+      subscriptions: subscriptions,
+      top_expenses: top_expenses
+    }
   end
 
   # GET /dashboard_category_transactions.json

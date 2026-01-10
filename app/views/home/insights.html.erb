@@ -8,12 +8,11 @@
       <!-- Filters -->
       <div class="bg-white rounded-lg border border-gray-100 p-4 mb-4 flex items-center space-x-4">
         <div class="flex items-center space-x-2">
-          <label class="text-sm text-gray-600">Start</label>
-          <input id="filter-start" type="date" value="<%= @range_start ? @range_start.strftime('%Y-%m-%d') : '' %>" class="border rounded px-2 py-1 text-sm">
-        </div>
-        <div class="flex items-center space-x-2">
-          <label class="text-sm text-gray-600">End</label>
-          <input id="filter-end" type="date" value="<%= @range_end ? @range_end.strftime('%Y-%m-%d') : '' %>" class="border rounded px-2 py-1 text-sm">
+          <label class="text-sm text-gray-600">Month (smart)</label>
+          <input id="filter-month-text" type="text" placeholder="e.g. Dec 2024" value="<%= if @range_start && @range_end && @range_start.month == @range_end.month && @range_start.year == @range_end.year then @range_start.strftime('%b %Y') end %>" class="border rounded px-2 py-1 text-sm w-48">
+          <div id="filter-month-error" class="text-xs text-red-600 ml-2 hidden"></div>
+          <input id="filter-start" type="hidden" value="<%= @range_start ? @range_start.strftime('%Y-%m-%d') : '' %>">
+          <input id="filter-end" type="hidden" value="<%= @range_end ? @range_end.strftime('%Y-%m-%d') : '' %>">
         </div>
         <div class="flex items-center space-x-2">
           <label class="text-sm text-gray-600">Category</label>
@@ -31,9 +30,61 @@
         </div>
       </div>
 
+      <!-- Top tiles: Subscriptions + Top expenses -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <!-- Subscriptions tile -->
+        <div class="bg-white rounded-lg border border-gray-100 p-4">
+          <h3 class="font-medium text-gray-900 mb-2">Subscriptions (appearing ≥ 3 times)</h3>
+          <div class="text-sm text-gray-600 mb-3">Detected recurring transactions grouped by name and account.</div>
+          <div id="subscriptions-list" class="max-h-56 overflow-y-auto divide-y">
+            <% if @subscriptions.present? %>
+              <% @subscriptions.each do |s| %>
+                <div class="py-2 flex items-center justify-between">
+                  <div>
+                    <div class="font-medium text-gray-800"><%= s[:name].capitalize %></div>
+                    <div class="text-xs text-gray-500"><%= s[:account_name].presence || '—' %> • <%= pluralize(s[:count], 'occurrence') %></div>
+                  </div>
+                  <div class="text-sm text-gray-700">
+                    <div class="font-medium"><%= number_to_currency(s[:avg_amount]) %></div>
+                    <div class="text-xs text-gray-400"><%= s[:last_at].to_date.strftime('%Y-%m-%d') if s[:last_at] %></div>
+                  </div>
+                </div>
+              <% end %>
+            <% else %>
+              <div class="py-2 text-sm text-gray-500">No recurring transactions detected.</div>
+            <% end %>
+          </div>
+        </div>
+
+        <!-- Top expenses tile -->
+        <div class="bg-white rounded-lg border border-gray-100 p-4">
+          <h3 class="font-medium text-gray-900 mb-2">Top 20 Largest Expenses</h3>
+          <div class="text-sm text-gray-600 mb-3">Largest expense transactions (most to least expensive).</div>
+          <div id="top-expenses-list" class="max-h-56 overflow-y-auto divide-y">
+            <% if @top_expenses.present? %>
+              <% @top_expenses.each do |t| %>
+                <div class="py-2 flex items-center justify-between">
+                  <div class="min-w-0">
+                    <div class="font-medium text-gray-800 truncate"><%= t[:name] %></div>
+                    <div class="text-xs text-gray-500 truncate"><%= t[:account_name].presence || '—' %> • <%= t[:category].presence || 'Uncategorized' %></div>
+                  </div>
+                  <div class="text-right ml-4">
+                    <div class="font-medium text-gray-800"><%= number_to_currency(t[:amount]) %></div>
+                    <div class="text-xs text-gray-400"><%= t[:created_at].to_date.strftime('%Y-%m-%d') %></div>
+                  </div>
+                </div>
+              <% end %>
+            <% else %>
+              <div class="py-2 text-sm text-gray-500">No expense transactions found.</div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
       <!-- Chart card -->
       <div class="bg-white rounded-lg border border-gray-100 p-6">
         <h2 class="text-lg font-medium mb-4">Spending per month</h2>
+        <h3 class="text-medium font-medium"> Click a bar to see transactions</h3>
         <div class="w-full">
           <canvas id="spendingChart" width="800" height="320"></canvas>
         </div>
@@ -75,6 +126,64 @@
         return Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&')
       }
 
+      // parse flexible month/year text like "Dec 2024", "dec 24", "12/2024" -> returns { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' } or null
+      function parseMonthYear(input) {
+        if (!input) return null
+        const s = input.toString().trim().toLowerCase()
+        const months = { jan:0, january:0, feb:1, february:1, mar:2, march:2, apr:3, april:3, may:4, jun:5, june:5, jul:6, july:6, aug:7, august:7, sep:8, sept:8, september:8, oct:9, october:9, nov:10, november:10, dec:11, december:11 }
+
+        // month name + year (e.g. "dec 2024" or "dec-24")
+        let m = null, y = null
+        let m1 = s.match(/^([a-z]{3,9})[\.\-\s]*(\d{2,4})$/i)
+        if (m1) {
+          const mon = m1[1].toLowerCase()
+          if (months.hasOwnProperty(mon)) m = months[mon]
+          else {
+            const ab = mon.substr(0,3)
+            if (months.hasOwnProperty(ab)) m = months[ab]
+          }
+          y = parseInt(m1[2], 10)
+        }
+
+        // numeric month/year like 12/2024 or 12-24
+        if (m === null) {
+          let m2 = s.match(/^(\d{1,2})[\/\-](\d{2,4})$/)
+          if (m2) {
+            const mm = parseInt(m2[1], 10)
+            if (mm >= 1 && mm <= 12) m = mm - 1
+            y = parseInt(m2[2], 10)
+          }
+        }
+
+        // year-only like "2025" or "25" -> whole year
+        if (m === null) {
+          const yOnly = s.match(/^(\d{2,4})$/)
+          if (yOnly) {
+            let yy = parseInt(yOnly[1], 10)
+            if (yy < 100) yy = 2000 + yy
+            const startStr = `${yy}-01-01`
+            const endStr = `${yy}-12-31`
+            return { start: startStr, end: endStr }
+          }
+        }
+
+        if (m === null || !y) return null
+
+        // two-digit year heuristic -> map to 2000-2099
+        if (y < 100) y = 2000 + y
+
+        try {
+          const start = new Date(y, m, 1)
+          const end = new Date(y, m + 1, 0)
+          const pad = n => String(n).padStart(2, '0')
+          const startStr = `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`
+          const endStr = `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`
+          return { start: startStr, end: endStr }
+        } catch (e) {
+          return null
+        }
+      }
+
       async function fetchAndRender() {
         const start = document.getElementById('filter-start').value
         const end = document.getElementById('filter-end').value
@@ -95,6 +204,8 @@
             chart.data.datasets[0].data = income
             chart.data.datasets[1].data = spend
             chart.update()
+            // update top tiles from JSON response
+            renderTiles(body)
           } else {
             chart = new Chart(ctx, {
               type: 'bar',
@@ -179,8 +290,107 @@
               document.getElementById('insights-transactions').classList.add('hidden')
             })
           }
+          // render tiles on first load as well
+          renderTiles(body)
         } catch (err) {
           console.error('Failed to fetch dashboard data', err)
+        }
+      }
+
+      function formatCurrency(n) {
+        try {
+          return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(n || 0))
+        } catch (e) {
+          return `$${Number(n || 0).toFixed(2)}`
+        }
+      }
+
+      function renderTiles(data) {
+        // Subscriptions
+        const subs = data.subscriptions || []
+        const subsEl = document.getElementById('subscriptions-list')
+        if (!subsEl) return
+        subsEl.innerHTML = ''
+        if (subs.length === 0) {
+          const div = document.createElement('div')
+          div.className = 'py-2 text-sm text-gray-500'
+          div.textContent = 'No recurring transactions detected.'
+          subsEl.appendChild(div)
+        } else {
+          subs.forEach(s => {
+            const row = document.createElement('div')
+            row.className = 'py-2 flex items-center justify-between'
+            const left = document.createElement('div')
+            const title = document.createElement('div')
+            title.className = 'font-medium text-gray-800'
+            title.textContent = (s.name || '').toString().replace(/^./, c => c.toUpperCase())
+            const meta = document.createElement('div')
+            meta.className = 'text-xs text-gray-500'
+            const acc = s.account_name || '—'
+            const occ = `${s.count} occurrence${s.count !== 1 ? 's' : ''}`
+            meta.textContent = `${acc} • ${occ}`
+            left.appendChild(title)
+            left.appendChild(meta)
+
+            const right = document.createElement('div')
+            right.className = 'text-sm text-gray-700'
+            const amt = document.createElement('div')
+            amt.className = 'font-medium'
+            amt.textContent = formatCurrency(s.avg_amount)
+            const last = document.createElement('div')
+            last.className = 'text-xs text-gray-400'
+            last.textContent = s.last_at ? new Date(s.last_at).toISOString().slice(0,10) : ''
+            right.appendChild(amt)
+            right.appendChild(last)
+
+            row.appendChild(left)
+            row.appendChild(right)
+            subsEl.appendChild(row)
+          })
+        }
+
+        // Top expenses
+        const tops = data.top_expenses || []
+        const topsEl = document.getElementById('top-expenses-list')
+        if (!topsEl) return
+        topsEl.innerHTML = ''
+        if (tops.length === 0) {
+          const div = document.createElement('div')
+          div.className = 'py-2 text-sm text-gray-500'
+          div.textContent = 'No expense transactions found.'
+          topsEl.appendChild(div)
+        } else {
+          tops.forEach(t => {
+            const row = document.createElement('div')
+            row.className = 'py-2 flex items-center justify-between'
+            const left = document.createElement('div')
+            left.className = 'min-w-0'
+            const title = document.createElement('div')
+            title.className = 'font-medium text-gray-800 truncate'
+            title.textContent = t.name || ''
+            const meta = document.createElement('div')
+            meta.className = 'text-xs text-gray-500 truncate'
+            const acc = t.account_name || '—'
+            const cat = t.category || 'Uncategorized'
+            meta.textContent = `${acc} • ${cat}`
+            left.appendChild(title)
+            left.appendChild(meta)
+
+            const right = document.createElement('div')
+            right.className = 'text-right ml-4'
+            const amt = document.createElement('div')
+            amt.className = 'font-medium text-gray-800'
+            amt.textContent = formatCurrency(t.amount)
+            const date = document.createElement('div')
+            date.className = 'text-xs text-gray-400'
+            date.textContent = t.created_at ? new Date(t.created_at).toISOString().slice(0,10) : ''
+            right.appendChild(amt)
+            right.appendChild(date)
+
+            row.appendChild(left)
+            row.appendChild(right)
+            topsEl.appendChild(row)
+          })
         }
       }
 
@@ -189,12 +399,48 @@
       document.getElementById('filter-end').addEventListener('change', fetchAndRender)
       document.getElementById('filter-category').addEventListener('change', fetchAndRender)
 
+      // smart month free-text input: parse on Enter and on blur
+      const monthInput = document.getElementById('filter-month-text')
+      if (monthInput) {
+        monthInput.addEventListener('keydown', function(e){
+          if (e.key === 'Enter') {
+            const text = monthInput.value
+            if (text && text.trim() !== '') {
+              const r = parseMonthYear(text)
+              const errEl = document.getElementById('filter-month-error')
+              if (!r) {
+                e.preventDefault()
+                if (errEl) { errEl.textContent = 'Could not parse month/year. Try "Dec 2024" or "12/2024"'; errEl.classList.remove('hidden') }
+                setTimeout(()=>{ if (errEl) { errEl.classList.add('hidden'); errEl.textContent = '' } }, 4000)
+                return false
+              }
+              document.getElementById('filter-start').value = r.start
+              document.getElementById('filter-end').value = r.end
+              fetchAndRender()
+            }
+          }
+        })
+
+        monthInput.addEventListener('blur', function(){
+          const text = monthInput.value
+          if (text && text.trim() !== '') {
+            const r = parseMonthYear(text)
+            if (r) {
+              document.getElementById('filter-start').value = r.start
+              document.getElementById('filter-end').value = r.end
+            }
+          }
+        })
+      }
+
       document.getElementById('btn-this-month').addEventListener('click', () => {
         const now = new Date()
         const y = now.getFullYear()
         const m = String(now.getMonth()+1).padStart(2,'0')
         document.getElementById('filter-start').value = `${y}-${m}-01`
         document.getElementById('filter-end').value = `${y}-${m}-${String(now.getDate()).padStart(2,'0')}`
+        const mi = document.getElementById('filter-month-text')
+        if (mi) { mi.value = new Date(y, Number(m)-1, 1).toLocaleString(undefined, { month: 'short' }) + ' ' + y }
         fetchAndRender()
       })
 
@@ -208,6 +454,8 @@
         const end = `${y}-${String(endDate.getDate()).padStart(2,'0')}`
         document.getElementById('filter-start').value = start
         document.getElementById('filter-end').value = `${y}-${m}-${String(endDate.getDate()).padStart(2,'0')}`
+        const mi = document.getElementById('filter-month-text')
+        if (mi) { mi.value = new Date(y, Number(m)-1, 1).toLocaleString(undefined, { month: 'short' }) + ' ' + y }
         fetchAndRender()
       })
 
@@ -216,6 +464,8 @@
         const y = now.getFullYear()
         document.getElementById('filter-start').value = `${y}-01-01`
         document.getElementById('filter-end').value = `${y}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+        const mi = document.getElementById('filter-month-text')
+        if (mi) { mi.value = '' }
         fetchAndRender()
       })
 
