@@ -4,11 +4,29 @@
     <h2 class="text-2xl font-bold mb-6 text-center">
       Upload Transactions CSV
     </h2>
+      <% if @recent_imports.present? %>
+        <div class="mb-6 bg-gray-50 rounded-lg p-4 border border-gray-100">
+          <h3 class="font-semibold text-gray-900 mb-2">Previous uploads</h3>
+          <ul class="text-sm text-gray-700 space-y-1">
+            <% @recent_imports.each do |imp| %>
+              <li class="flex items-center justify-between">
+                <div>
+                  <span class="font-medium"><%= imp.account_name %></span>
+                  <% if imp.filename.present? %>
+                    <span class="text-gray-500">— <%= imp.filename %></span>
+                  <% end %>
+                </div>
+                <div class="text-xs text-gray-400"><%= time_ago_in_words(imp.created_at) %> ago</div>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
 
-    <%= form_with url: transactions_import_path,
-                  multipart: true,
-                  class: "space-y-6",
-                  data: { controller: "dropzone" } do |f| %>
+  <%= form_with url: transactions_import_path,
+          multipart: true,
+          class: "space-y-6",
+          data: { controller: "dropzone", action: "submit->dropzone#validateBeforeSubmit" } do |f| %>
 
       <!-- Account Name -->
       <div class="flex flex-col md:flex-row md:items-center md:space-x-4">
@@ -19,6 +37,8 @@
          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
       data: { dropzone_target: "account" } %>
       </div>
+
+      <div data-dropzone-target="error" id="import-file-error" class="hidden text-sm text-red-600 mt-2">Please upload a CSV file when entering an account name.</div>
 
       <!-- Transactions CSV -->
       <div data-dropzone-target="area"

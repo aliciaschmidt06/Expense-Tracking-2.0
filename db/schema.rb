@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_10_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_10_120001) do
   create_table "categories", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "keywords"
@@ -18,6 +18,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_10_120000) do
     t.string "target_comparison"
     t.float "target_percentage"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "transaction_imports", force: :cascade do |t|
+    t.string "account_name", null: false
+    t.datetime "created_at", null: false
+    t.integer "created_count", default: 0, null: false
+    t.string "filename"
+    t.integer "skipped_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_name"], name: "index_transaction_imports_on_account_name"
   end
 
   create_table "transactions", force: :cascade do |t|

@@ -2,7 +2,9 @@
 require "csv"
 
 class ImportsController < ApplicationController
-  def new; end
+  def new
+    @recent_imports = TransactionImport.order(created_at: :desc).limit(10)
+  end
 
   def transactions
     file = params[:file]
@@ -67,6 +69,12 @@ class ImportsController < ApplicationController
     details << "#{created_count} #{created_count == 1 ? 'new record' : 'new records'}" if created_count > 0
     details << "#{skipped_count} #{skipped_count == 1 ? 'duplicate skipped' : 'duplicates skipped'}" if skipped_count > 0
     notice_msg += " — " + details.join(', ') unless details.empty?
+    # Record the import so the filename and counts are preserved for display
+    begin
+      TransactionImport.create!(account_name: account_name, filename: file.respond_to?(:original_filename) ? file.original_filename : nil, created_count: created_count, skipped_count: skipped_count)
+    rescue => e
+      Rails.logger.warn "Failed to create TransactionImport record: #{e.message}"
+    end
 
     redirect_to transactions_path, notice: notice_msg
   end

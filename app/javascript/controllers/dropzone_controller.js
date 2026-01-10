@@ -2,7 +2,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["input", "area", "filename", "configInput", "configArea", "configFilename", "account"]
+  static targets = ["input", "area", "filename", "configInput", "configArea", "configFilename", "account", "error"]
 
   connect() {
     // CSV area may not exist
@@ -78,6 +78,40 @@ export default class extends Controller {
       this.configFilenameTarget.textContent = `Selected file: ${this.configInputTarget.files[0].name}`
     } else {
       this.configFilenameTarget.textContent = ""
+    }
+  }
+
+  // Validate before submitting the form: if an account name is provided but no CSV file selected,
+  validateBeforeSubmit(event) {
+    try {
+      const hasAccount = this.hasAccountTarget && this.accountTarget.value && this.accountTarget.value.trim() !== ''
+      const hasFile = this.hasInputTarget && this.inputTarget.files && this.inputTarget.files.length > 0
+
+      if (hasAccount && !hasFile) {
+        event.preventDefault()
+        if (this.hasErrorTarget) {
+          this.errorTarget.textContent = 'Please upload a CSV file.'
+          this.errorTarget.classList.remove('hidden')
+        } else {
+          alert('Please upload a CSV file.')
+        }
+
+        if (this.hasAreaTarget) {
+          this.areaTarget.classList.add('ring-2', 'ring-red-300')
+        }
+
+        setTimeout(() => {
+          if (this.hasErrorTarget) {
+            this.errorTarget.classList.add('hidden')
+            this.errorTarget.textContent = ''
+          }
+          if (this.hasAreaTarget) {
+            this.areaTarget.classList.remove('ring-2', 'ring-red-300')
+          }
+        }, 5000)
+      }
+    } catch (e) {
+      return true
     }
   }
 }
