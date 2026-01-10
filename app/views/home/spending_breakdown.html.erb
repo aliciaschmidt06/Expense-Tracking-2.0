@@ -19,6 +19,12 @@
             <label class="text-sm text-gray-600">End</label>
             <input id="filter-end" type="date" value="<%= @range_end ? @range_end.strftime('%Y-%m-%d') : '' %>" class="border rounded px-2 py-1 text-sm">
           </div>
+          <div class="flex items-center space-x-2">
+            <label class="text-sm text-gray-600">Quick month</label>
+            <input id="filter-month-text" type="text" placeholder="e.g. Dec 2024" class="border rounded px-2 py-1 text-sm w-48">
+            <button id="btn-apply-month-text" class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">Apply</button>
+            <div id="filter-month-error" class="text-xs text-red-600 ml-2 hidden"></div>
+          </div>
           <div class="ml-auto flex items-center space-x-2">
             <button id="btn-this-month" class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">This month</button>
             <button id="btn-last-month" class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">Last month</button>
@@ -32,6 +38,11 @@
           <!-- Filled by JS: grouped categories with transactions under each -->
           <div id="grouped-container" class="w-full"></div>
         </div>
+        <% if defined?(@unknown_transactions_count) && @unknown_transactions_count.to_i > 0 %>
+          <div class="mt-4 flex justify-center">
+            <%= link_to "Review uncategorized transactions (#{@unknown_transactions_count})", uncategorized_transactions_path, class: "inline-flex items-center justify-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600" %>
+          </div>
+        <% end %>
       </div>
     </section>
   </main>
@@ -49,6 +60,60 @@
       function titleCase(s) {
         if (!s) return ''
         return s.toString().replace(/\w\S*/g, function(txt){ return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase(); })
+      }
+
+      // Parse flexible month/year text like "Dec 2024", "dec 24", "12/2024" -> returns { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' } or null
+      function parseMonthYear(input) {
+        if (!input) return null
+        const s = input.toString().trim().toLowerCase()
+        const months = { jan:0, january:0, feb:1, february:1, mar:2, march:2, apr:3, april:3, may:4, jun:5, june:5, jul:6, july:6, aug:7, august:7, sep:8, sept:8, september:8, oct:9, october:9, nov:10, november:10, dec:11, december:11 }
+
+        // month name + year (e.g. "dec 2024" or "dec-24")
+        let m = null, y = null
+        let m1 = s.match(/^([a-z]{3,9})[\.\-\s]*(\d{2,4})$/i)
+        if (m1) {
+          const mon = m1[1].toLowerCase()
+          if (months.hasOwnProperty(mon)) m = months[mon]
+          else {
+            const ab = mon.substr(0,3)
+            if (months.hasOwnProperty(ab)) m = months[ab]
+          }
+          y = parseInt(m1[2], 10)
+        }
+
+        // numeric month/year like 12/2024 or 12-24
+        if (m === null) {
+          let m2 = s.match(/^(\d{1,2})[\/\-](\d{2,4})$/)
+          if (m2) {
+            const mm = parseInt(m2[1], 10)
+            if (mm >= 1 && mm <= 12) m = mm - 1
+            y = parseInt(m2[2], 10)
+          }
+        }
+
+        if (m === null || !y) return null
+
+        // two-digit year heuristic -> map to 2000-2099
+        if (y < 100) y = 2000 + y
+
+        try {
+          const start = new Date(y, m, 1)
+          const end = new Date(y, m + 1, 0)
+          const pad = n => String(n).padStart(2, '0')
+          const startStr = `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`
+          const endStr = `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`
+          return { start: startStr, end: endStr }
+        } catch (e) {
+          return null
+        }
+      }
+
+      function showMonthError(msg) {
+        const el = document.getElementById('filter-month-error')
+        if (!el) return
+        el.textContent = msg
+        el.classList.remove('hidden')
+        setTimeout(() => { el.classList.add('hidden'); el.textContent = '' }, 4000)
       }
 
       // deterministic color generation per category name
@@ -157,19 +222,16 @@
                   headerRight.className = cls + ' text-sm'
                   // Build a human-readable comparison label (e.g. "Less than 50% target")
                   const pct = (typeof cat.target_percentage !== 'undefined') ? parseFloat(cat.target_percentage) : null
-                  let compLabel = ''
-                  if (comp === 'less_than') compLabel = 'Less than'
-                  else if (comp === 'greater_than') compLabel = 'Greater than'
-                  else if (comp === 'equal_to') compLabel = 'Equal to'
-                  else compLabel = 'Target'
-
                   let labelText = ''
                   if (comp === 'not_applicable') {
                     labelText = 'Not applicable'
-                  } else if (pct !== null && !isNaN(pct)) {
-                    labelText = `${compLabel} ${pct}% target`
                   } else {
-                    labelText = `${compLabel} target`
+                    const pctText = (pct !== null && !isNaN(pct)) ? `${pct.toFixed(1)}%` : ''
+                    if (pctText) {
+                      labelText = hit ? `Met target of ${pctText}` : `Did not meet target of ${pctText}`
+                    } else {
+                      labelText = hit ? 'Met target' : 'Did not meet target'
+                    }
                   }
 
                   headerRight.textContent = labelText
@@ -290,6 +352,27 @@
         document.getElementById('filter-start').value = `${y}-${m}-01`
         document.getElementById('filter-end').value = `${y}-${m}-${String(now.getDate()).padStart(2,'0')}`
         fetchGrouped()
+      })
+
+      // apply quick month text input
+      document.getElementById('btn-apply-month-text').addEventListener('click', () => {
+        const text = document.getElementById('filter-month-text').value
+        const r = parseMonthYear(text)
+        if (!r) {
+          showMonthError('Could not parse month/year. Try "Dec 2024" or "12/2024"')
+          return
+        }
+        document.getElementById('filter-start').value = r.start
+        document.getElementById('filter-end').value = r.end
+        fetchGrouped()
+      })
+
+      // press Enter in text box to apply
+      document.getElementById('filter-month-text').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          document.getElementById('btn-apply-month-text').click()
+        }
       })
 
       document.getElementById('btn-last-month').addEventListener('click', () => {

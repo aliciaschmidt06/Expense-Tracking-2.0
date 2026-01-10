@@ -93,6 +93,9 @@ class HomeController < ApplicationController
     end
 
     @categories = Category.where.not(target_percentage: nil).where('target_percentage > 0').order(:name)
+    # count Unknown-category transactions so the spending breakdown view can show a persistent link
+    unknown = Category.where('LOWER(name) = ?', 'unknown').first
+    @unknown_transactions_count = unknown.present? ? Transaction.where(category_id: unknown.id).count : 0
   end
 
   # GET /dashboard_data.json
