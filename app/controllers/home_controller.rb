@@ -46,6 +46,9 @@ class HomeController < ApplicationController
 
       missing_keywords || missing_target
     end
+    # count Unknown-category transactions so the UI can show a direct link to review them
+    unknown = Category.where('LOWER(name) = ?', 'unknown').first
+    @unknown_transactions_count = unknown.present? ? Transaction.where(category_id: unknown.id).count : 0
   end
 
   # GET /insights
@@ -121,13 +124,14 @@ class HomeController < ApplicationController
       start_date ||= (end_date << 11).beginning_of_month.to_date
     end
 
-    scope = Transaction.all
+  scope = Transaction.all
     scope = scope.where(category_id: category_id) if category_id.present?
     scope = scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
     scope = scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
 
-    # load and group in Ruby (DB-agnostic)
-    txs = scope.select(:amount, :created_at).to_a
+  # load and group in Ruby (DB-agnostic)
+  # include category and transaction_type so we can split income vs spend and exclude special categories
+  txs = scope.select(:amount, :created_at, :transaction_type, :category_id).to_a
     months = []
     cursor = start_date.beginning_of_month
     end_month = end_date.beginning_of_month
@@ -136,18 +140,34 @@ class HomeController < ApplicationController
       cursor = cursor.next_month
     end
 
-    totals = months.map do |m|
-      bucket = txs.select { |t| t.created_at.to_date.beginning_of_month == m }
+    # find special categories (case-insensitive)
+    ignore_cat = Category.where('LOWER(name) = ?', 'ignore').first
+    unknown_cat = Category.where('LOWER(name) = ?', 'unknown').first
+
+    income_totals = months.map do |m|
+      bucket = txs.select { |t| t.created_at.to_date.beginning_of_month == m && t.transaction_type.to_s == 'income' }
+      bucket.sum { |t| (t.amount || 0).to_f }
+    end
+
+    spend_totals = months.map do |m|
+      bucket = txs.select { |t|
+        t.created_at.to_date.beginning_of_month == m && t.transaction_type.to_s != 'income' &&
+        !(ignore_cat && t.category_id == ignore_cat.id) &&
+        !(unknown_cat && t.category_id == unknown_cat.id)
+      }
       bucket.sum { |t| (t.amount || 0).to_f }
     end
 
     labels = months.map { |m| m.strftime('%b %Y') }
 
-    period_scope = Transaction.all
+  period_scope = Transaction.all
     period_scope = period_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
     period_scope = period_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
-    ignore = Category.find_by(name: 'Ignore')
-    period_scope = period_scope.where.not(category_id: ignore.id) if ignore.present?
+  # exclude Ignore and Unknown categories from period calculations
+  ignore = Category.where('LOWER(name) = ?', 'ignore').first
+  unknown = Category.where('LOWER(name) = ?', 'unknown').first
+  period_scope = period_scope.where.not(category_id: ignore.id) if ignore.present?
+  period_scope = period_scope.where.not(category_id: unknown.id) if unknown.present?
 
     total_sum = period_scope.sum(:amount).to_f
     income_total = period_scope.where(transaction_type: Transaction.transaction_types[:income]).sum(:amount).to_f
@@ -170,7 +190,7 @@ class HomeController < ApplicationController
       }
     end
 
-    render json: { labels: labels, totals: totals, breakdown: categories, total_sum: total_sum.round(2), income_total: income_total.round(2) }
+    render json: { labels: labels, income: income_totals, spend: spend_totals, breakdown: categories, total_sum: total_sum.round(2), income_total: income_total.round(2) }
   end
 
   # GET /dashboard_category_transactions.json

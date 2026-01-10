@@ -9,6 +9,8 @@ class TransactionsController < ApplicationController
   def index
     @transactions = Transaction.all.includes(:category)
     @categories = Category.order(:name)
+    # available account names for filter (compact removes nils)
+    @accounts = Transaction.distinct.pluck(:account_name).compact.map(&:to_s).uniq.sort
 
     # Search by name
     if params[:q].present?
@@ -42,6 +44,11 @@ class TransactionsController < ApplicationController
     # Filter by category if selected
     if params[:category_id].present?
       @transactions = @transactions.where(category_id: params[:category_id])
+    end
+
+    # Filter by account name if provided
+    if params[:account_name].present?
+      @transactions = @transactions.where(account_name: params[:account_name])
     end
 
     # Count results for the view (after filters applied)
@@ -78,13 +85,18 @@ class TransactionsController < ApplicationController
     # uncategorized list HTML so the client can refresh that pane.
     unknown = Category.find_by(name: "Unknown")
     remaining = unknown ? Transaction.where(category: unknown).includes(:category) : Transaction.none
-    remaining_html = render_to_string(partial: 'transactions/uncategorized_list', locals: { transactions: remaining })
+  # force HTML format when rendering the partial string to avoid lookup for JSON variants
+  remaining_html = render_to_string(partial: 'transactions/uncategorized_list', locals: { transactions: remaining }, formats: [:html])
 
     render json: { success: true, transaction_id: @transaction.id, category_name: category.name, remaining_html: remaining_html }
   rescue ActiveRecord::RecordNotFound => e
     render json: { success: false, error: e.message }, status: :not_found
   rescue ActiveRecord::RecordInvalid => e
     render json: { success: false, error: e.message }, status: :unprocessable_entity
+  rescue StandardError => e
+    # unexpected server error: log and return JSON so client-side can present a helpful message
+    Rails.logger.error "assign_category failed: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
+    render json: { success: false, error: "Server error while assigning category: #{e.message}" }, status: :internal_server_error
   end
 
   # GET /transactions/1 or /transactions/1.json

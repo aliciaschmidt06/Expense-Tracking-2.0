@@ -20,11 +20,23 @@
           <% @categories.each do |c| %>
             <div class="p-4 rounded-lg border border-gray-200 bg-white category-dropzone" data-category-id="<%= c.id %>">
               <div class="flex justify-between items-center">
-                <div>
-                  <div class="font-medium text-gray-900"><%= c.name %></div>
-                  <div class="text-xs text-gray-500"><%= Array(c.keywords).join(', ') %></div>
+                <div class="min-w-0">
+                  <div class="font-medium text-gray-900 truncateme"><%= c.name %></div>
+                  <%# Render up to 3 keywords and show full list in a title tooltip to avoid overflowing the box %>
+                  <% kws = [] %>
+                  <% if c.respond_to?(:keyword_list) %>
+                    <% kws = Array(c.keyword_list || []) %>
+                  <% elsif c.respond_to?(:keywords) %>
+                    <% kws = Array(c.keywords || []) %>
+                  <% end %>
+                  <% if kws.any? %>
+                    <% short = kws.first(3).join(', ') %>
+                    <div class="text-xs text-gray-500 truncate max-w-xs" title="<%= kws.join(', ') %>"><%= short %><%= '…' if kws.size > 3 %></div>
+                  <% else %>
+                    <div class="text-xs text-gray-400 italic">no keywords</div>
+                  <% end %>
                 </div>
-                <div class="text-sm text-gray-500">Drop here</div>
+                <div class="ml-4 flex-shrink-0 text-sm text-gray-500">Drop here</div>
               </div>
             </div>
           <% end %>
@@ -87,8 +99,11 @@
               },
               body: JSON.stringify({ category_id: categoryId })
             })
-            const body = await res.json()
-            if (res.ok && body.success) {
+            // handle non-JSON or error responses gracefully
+            let body = null
+            const text = await res.text()
+            try { body = text ? JSON.parse(text) : null } catch (e) { body = null }
+            if (res.ok && body && body.success) {
               // replace left list with returned HTML so other matching transactions
               // that were assigned server-side also disappear
               if (body.remaining_html !== undefined) {
@@ -107,11 +122,14 @@
               zone.classList.add('ring-2','ring-green-300')
               setTimeout(()=> zone.classList.remove('ring-2','ring-green-300'), 900)
             } else {
-              alert('Failed to assign category: ' + (body.error || res.statusText))
+              const errMsg = (body && body.error) ? body.error : (res.statusText || 'Unknown error')
+              const detail = text && !body ? ` (response: ${text.slice(0,200)})` : ''
+              alert('Failed to assign category: ' + errMsg + detail)
             }
           } catch (err) {
             console.error(err)
-            alert('Network error while assigning category')
+            // show a more helpful message including exception text
+            alert('Network error while assigning category: ' + (err && err.message ? err.message : String(err)))
           }
         })
       })

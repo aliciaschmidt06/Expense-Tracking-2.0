@@ -26,6 +26,11 @@
                 <div class="mt-4">
                   <% if @has_transactions %>
                     <%= link_to "View transactions", transactions_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
+                    <% if @unknown_transactions_count && @unknown_transactions_count > 0 %>
+                      <div class="mt-2">
+                        <%= link_to "Review uncategorized (#{@unknown_transactions_count})", uncategorized_transactions_path, class: "inline-flex items-center justify-center w-full px-3 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 text-sm" %>
+                      </div>
+                    <% end %>
                   <% else %>
                     <%= link_to "Import transactions", new_import_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
                   <% end %>
@@ -116,6 +121,11 @@
                 <div class="mt-4">
                   <% if @has_transactions %>
                     <%= link_to "View transactions", transactions_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
+                    <% if @unknown_transactions_count && @unknown_transactions_count > 0 %>
+                      <div class="mt-2">
+                        <%= link_to "Review uncategorized (#{@unknown_transactions_count})", uncategorized_transactions_path, class: "inline-flex items-center justify-center w-full px-3 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 text-sm" %>
+                      </div>
+                    <% end %>
                   <% else %>
                     <%= link_to "Import transactions", new_import_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
                   <% end %>

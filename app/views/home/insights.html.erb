@@ -63,22 +63,32 @@
           const res = await fetch(url)
           const body = await res.json()
           const labels = body.labels || []
-          const totals = body.totals || []
+          // two series: income and spend
+          const income = body.income || []
+          const spend = body.spend || []
 
           if (chart) {
             chart.data.labels = labels
-            chart.data.datasets[0].data = totals
+            chart.data.datasets[0].data = income
+            chart.data.datasets[1].data = spend
             chart.update()
           } else {
             chart = new Chart(ctx, {
               type: 'bar',
               data: {
                 labels: labels,
-                datasets: [{
-                  label: 'Spending',
-                  data: totals,
-                  backgroundColor: 'rgba(59,130,246,0.6)'
-                }]
+                datasets: [
+                  {
+                    label: 'Income',
+                    data: income,
+                    backgroundColor: 'rgba(34,197,94,0.7)'
+                  },
+                  {
+                    label: 'Spending',
+                    data: spend,
+                    backgroundColor: 'rgba(59,130,246,0.6)'
+                  }
+                ]
               },
               options: {
                 responsive: true,

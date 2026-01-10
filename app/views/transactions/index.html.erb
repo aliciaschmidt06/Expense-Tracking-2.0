@@ -38,6 +38,10 @@
           <%= f.label :category_id, "Category", class: "text-sm font-medium text-gray-700" %>
           <%= f.select :category_id, options_for_select([["All categories",""]] + @categories.map { |c| [c.name, c.id] }, params[:category_id]), {}, class: "mt-1 block max-w-sm rounded-md border-gray-300 px-3 py-2" %>
         </div>
+        <div>
+          <%= f.label :account_name, "Account", class: "text-sm font-medium text-gray-700" %>
+          <%= f.select :account_name, options_for_select([["All accounts",""]] + (@accounts || []).map { |a| [a, a] }, params[:account_name]), {}, class: "mt-1 block max-w-sm rounded-md border-gray-300 px-3 py-2" %>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
