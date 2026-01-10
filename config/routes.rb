@@ -8,6 +8,10 @@ Rails.application.routes.draw do
   get 'spending_breakdown', to: 'home#spending_breakdown', as: 'spending_breakdown'
   get 'spending_breakdown/data', to: 'home#spending_breakdown_data', as: 'spending_breakdown_data'
   get 'spending_breakdown/export', to: 'home#spending_breakdown_export', as: 'spending_breakdown_export'
+  # Settings page and destructive actions
+  get 'settings', to: 'settings#index', as: 'settings'
+  post 'settings/clear_transactions', to: 'settings#clear_transactions', as: 'settings_clear_transactions'
+  post 'settings/clear_categories', to: 'settings#clear_categories', as: 'settings_clear_categories'
   resources :transactions do
     patch :assign_category, on: :member
   end

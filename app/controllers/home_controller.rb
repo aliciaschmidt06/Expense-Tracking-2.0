@@ -19,6 +19,33 @@ class HomeController < ApplicationController
     end
     # load categories for dashboard filter
     @categories = Category.order(:name)
+    # helpful counts for the landing page
+    @transactions_count = Transaction.count
+    @categorized_count = Transaction.where.not(category_id: nil).count
+
+  # boolean helpers for view logic
+  @has_transactions = @transactions_count > 0
+  # count categories excluding the Unknown fallback (case-insensitive)
+  @real_categories_count = Category.where.not("LOWER(name) = ?", 'unknown').count
+  @has_real_categories = @real_categories_count > 0
+
+    # detect incomplete categories:
+    # - Unknown category is allowed to have no keywords
+    # - Income and Ignore are allowed to have no target
+    @incomplete_categories = @categories.select do |c|
+      kws = c.keyword_list
+      lname = c.name.to_s.downcase
+
+      # missing keywords unless this is the Unknown category
+      missing_keywords = (kws.empty? && lname != 'unknown')
+
+      comp = c.respond_to?(:target_comparison) ? c.target_comparison.to_s : nil
+  # Income, Ignore and Unknown are allowed to have no target; otherwise require a positive target unless explicitly not_applicable
+  allowed_no_target = %w[income ignore unknown].include?(lname)
+      missing_target = (!allowed_no_target) && (comp != 'not_applicable') && (c.target_percentage.nil? || c.target_percentage.to_f <= 0)
+
+      missing_keywords || missing_target
+    end
   end
 
   # GET /insights
