@@ -10,7 +10,18 @@
     <div class="bg-gray-50 rounded-lg px-4 py-3">
       <p class="text-gray-500">Target</p>
       <p class="font-medium text-gray-800">
-        <%= category.target_percentage %>%
+        <%# Show target and its comparison rule (less_than / greater_than / equal_to / not_applicable) %>
+        <% if category.target_comparison.present? && category.target_comparison != 'not_applicable' %>
+          <%= category.target_percentage %>%
+          <span class="text-xs text-gray-500">(<%= category.target_comparison.humanize.downcase %>)</span>
+        <% else %>
+          <%# not_applicable or blank: show N/A or the numeric if present %>
+          <% if category.target_comparison == 'not_applicable' %>
+            <span class="text-gray-600">N/A</span>
+          <% else %>
+            <%= category.target_percentage %>%
+          <% end %>
+        <% end %>
       </p>
     </div>
 

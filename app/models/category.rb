@@ -1,6 +1,33 @@
 class Category < ApplicationRecord
   has_many :transactions
 
+  # Comparison rule for target percentage. Stored as string in :target_comparison.
+  # Use the constant and simple helpers instead of ActiveRecord::Enum to avoid
+  # compatibility issues across Rails versions.
+  TARGET_COMPARISONS = %w[equal_to less_than greater_than not_applicable].freeze
+
+  validates :target_comparison, inclusion: { in: TARGET_COMPARISONS }, allow_nil: true
+
+  def target_comparison_human
+    target_comparison.to_s.humanize unless target_comparison.blank?
+  end
+
+  def less_than?
+    target_comparison == 'less_than'
+  end
+
+  def greater_than?
+    target_comparison == 'greater_than'
+  end
+
+  def equal_to?
+    target_comparison == 'equal_to'
+  end
+
+  def not_applicable?
+    target_comparison == 'not_applicable'
+  end
+
   # Always return an array
   def keyword_list
     case keywords

@@ -17,10 +17,32 @@ class CategoryImportsController < ApplicationController
 
       total_percentage = 0.0
 
+      # helper to extract numeric percentage from either a scalar or the new mapping
+      extract_pct = lambda do |raw_target|
+        case raw_target
+        when Hash
+          if raw_target["equal_to"]
+            raw_target["equal_to"].to_f
+          elsif raw_target["less_than"]
+            raw_target["less_than"].to_f
+          elsif raw_target["greater_than"]
+            raw_target["greater_than"].to_f
+          else
+            0.0
+          end
+        when Numeric
+          raw_target.to_f
+        when String
+          raw_target.to_s.match?(/\A[+-]?\d+(?:\.\d+)?\z/) ? raw_target.to_f : 0.0
+        else
+          0.0
+        end
+      end
+
       if yaml_data["categories"].present?
         yaml_data["categories"].each do |_name, details|
           next unless details.is_a?(Hash)
-          total_percentage += (details["target_percentage"] || 0).to_f
+          total_percentage += extract_pct.call(details["target_percentage"])
         end
       end
 
@@ -44,7 +66,44 @@ class CategoryImportsController < ApplicationController
               []
             end
 
-          category.target_percentage = details["target_percentage"] || 0
+          # Support new YAML format where target_percentage may be a scalar or a map
+          raw_target = details["target_percentage"]
+          case raw_target
+          when Hash
+            # Expect one of: equal_to, less_than, greater_than or not_applicable
+            if raw_target["equal_to"]
+              category.target_percentage = raw_target["equal_to"].to_f
+              category.target_comparison = "equal_to"
+            elsif raw_target["less_than"]
+              category.target_percentage = raw_target["less_than"].to_f
+              category.target_comparison = "less_than"
+            elsif raw_target["greater_than"]
+              category.target_percentage = raw_target["greater_than"].to_f
+              category.target_comparison = "greater_than"
+            elsif raw_target["not_applicable"]
+              category.target_percentage = nil
+              category.target_comparison = "not_applicable"
+            else
+              # unknown structure: fallback to numeric 0
+              category.target_percentage = 0
+              category.target_comparison = "equal_to"
+            end
+          when Numeric
+            category.target_percentage = raw_target.to_f
+            category.target_comparison = "equal_to"
+          when String
+            # try parse as numeric
+            if raw_target.to_s.match?(/\A[+-]?\d+(?:\.\d+)?\z/)
+              category.target_percentage = raw_target.to_f
+              category.target_comparison = "equal_to"
+            else
+              category.target_percentage = 0
+              category.target_comparison = "equal_to"
+            end
+          else
+            category.target_percentage = details["target_percentage"] || 0
+            category.target_comparison = "equal_to"
+          end
           category.save!
         end
       end

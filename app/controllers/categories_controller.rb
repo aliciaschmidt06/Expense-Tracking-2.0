@@ -74,7 +74,18 @@ class CategoriesController < ApplicationController
       keywords = c.keyword_list
       # include keywords key only if present to keep YAML tidy
       details["keywords"] = keywords unless keywords.blank?
-      details["target_percentage"] = (c.target_percentage || 0)
+      # Export target percentage using the new mapping convention
+      case c.target_comparison.to_s
+      when 'less_than'
+        details["target_percentage"] = { "less_than" => (c.target_percentage || 0) }
+      when 'greater_than'
+        details["target_percentage"] = { "greater_than" => (c.target_percentage || 0) }
+      when 'not_applicable'
+        details["target_percentage"] = { "not_applicable" => true }
+      else
+        # default to equal_to for backward compatibility
+        details["target_percentage"] = { "equal_to" => (c.target_percentage || 0) }
+      end
       data["categories"][key] = details
     end
 
@@ -94,6 +105,6 @@ class CategoriesController < ApplicationController
     # The form submits `keywords` as a plain text field (comma-separated),
     # so permit it as a scalar. The model's `keyword_list` handles parsing.
     def category_params
-      params.require(:category).permit(:name, :target_percentage, :keywords)
+      params.require(:category).permit(:name, :target_percentage, :keywords, :target_comparison)
     end
 end

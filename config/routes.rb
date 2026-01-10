@@ -6,6 +6,7 @@ Rails.application.routes.draw do
   get 'dashboard_category_transactions', to: 'home#dashboard_category_transactions', as: 'dashboard_category_transactions'
   get 'insights', to: 'home#insights', as: 'insights'
   get 'spending_breakdown', to: 'home#spending_breakdown', as: 'spending_breakdown'
+  get 'spending_breakdown/data', to: 'home#spending_breakdown_data', as: 'spending_breakdown_data'
   get 'spending_breakdown/export', to: 'home#spending_breakdown_export', as: 'spending_breakdown_export'
   resources :transactions do
     patch :assign_category, on: :member

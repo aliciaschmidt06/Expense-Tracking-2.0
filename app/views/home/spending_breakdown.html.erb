@@ -26,41 +26,11 @@
           </div>
         </div>
 
-        <!-- Category breakdown -->
-        <div id="category-breakdown" class="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          <%# Filled by JS with cards that show category name and target percentage %>
-        </div>
+        <!-- Full grouped transactions table view -->
 
-        <!-- Transactions for selected category (table always visible, empty until a card is clicked) -->
-        <!-- Totals printout (updated by JS) -->
-        <div id="totals-printout" class="mb-4 text-sm text-gray-700">
-          <strong>Total Income: </strong><span id="total-income">$0.00</span>
-          &nbsp; <strong>Total Expenses: </strong><span id="total-expenses">$0.00</span>
-          &nbsp; <strong>Savings: </strong><span id="total-savings">$0.00</span>
-        </div>
-
-        <div id="category-transactions" class="bg-white rounded-lg border border-gray-100 p-4 mb-6">
-          <div class="flex items-center justify-between mb-3">
-            <h3 id="transactions-title" class="text-lg font-medium">Transactions (select a category)</h3>
-          </div>
-          <div id="category-transactions-list" class="overflow-x-auto">
-            <table id="category-transactions-table" class="min-w-full text-sm text-left">
-              <thead>
-                <tr class="text-xs text-gray-500 uppercase">
-                  <th class="px-3 py-2">Date</th>
-                  <th class="px-3 py-2">Name</th>
-                  <th class="px-3 py-2">Account</th>
-                  <th class="px-3 py-2">Type</th>
-                  <th class="px-3 py-2 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="px-3 py-6 text-gray-500" colspan="4">No category selected — click a category card above to view transactions.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div id="grouped-transactions" class="bg-white rounded-lg border border-gray-100 p-4 mb-6 overflow-x-auto">
+          <!-- Filled by JS: grouped categories with transactions under each -->
+          <div id="grouped-container" class="w-full"></div>
         </div>
       </div>
     </section>
@@ -72,181 +42,223 @@
         return Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&')
       }
 
-      async function fetchBreakdown() {
+      function money(v){
+        return `$${(parseFloat(v) || 0).toFixed(2)}`
+      }
+
+      function titleCase(s) {
+        if (!s) return ''
+        return s.toString().replace(/\w\S*/g, function(txt){ return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase(); })
+      }
+
+      // deterministic color generation per category name
+      function hashString(str) {
+        let hash = 0
+        if (!str) return hash
+        for (let i = 0; i < str.length; i++) {
+          hash = ((hash << 5) - hash) + str.charCodeAt(i)
+          hash |= 0 // convert to 32bit int
+        }
+        return Math.abs(hash)
+      }
+
+      function colorsForName(name) {
+        const h = hashString(name) % 360
+        // title/text color (darker)
+        const titleColor = `hsl(${h}, 65%, 28%)`
+        // light background for alternating rows
+        const rowLight = `hsl(${h}, 80%, 96%)`
+        return { titleColor, rowLight }
+      }
+
+      async function fetchGrouped() {
         const start = document.getElementById('filter-start').value
         const end = document.getElementById('filter-end').value
-    const params = { start_date: start, end_date: end, include_zero: '1' }
-        const url = '<%= dashboard_data_path %>.json?' + formatParams(params)
+        const params = { start_date: start, end_date: end }
+        const url = '<%= spending_breakdown_data_path %>.json?' + formatParams(params)
         try {
           const res = await fetch(url)
+          if (!res.ok) throw new Error('Network response not ok')
           const body = await res.json()
-          let breakdown = body.breakdown || []
 
-          // update totals printout above the transactions table
+          // Income summary (element may have been removed); only set if present
+          const income = (body.income_summary && body.income_summary.amount) ? body.income_summary.amount : 0
+          const incomeEl = document.getElementById('income-summary')
+          const incomeNoteEl = document.getElementById('income-note')
+          if (incomeEl) incomeEl.textContent = money(income)
+          if (incomeNoteEl) incomeNoteEl.textContent = body.income_summary && body.income_summary.note ? `(${body.income_summary.note})` : ''
+
+          const totalSum = body.total_sum || 0
+
+          const container = document.getElementById('grouped-container')
+          container.innerHTML = ''
+
           try {
-            const incomeTotal = parseFloat(body.income_total || 0)
-            const totalSum = parseFloat(body.total_sum || 0)
-            const expenseTotal = Math.max(0, totalSum - incomeTotal)
-            const savings = incomeTotal - expenseTotal
-            const elIncome = document.getElementById('total-income')
-            const elExpenses = document.getElementById('total-expenses')
-            const elSavings = document.getElementById('total-savings')
-            if (elIncome) elIncome.textContent = `$${incomeTotal.toFixed(2)}`
-            if (elExpenses) elExpenses.textContent = `$${expenseTotal.toFixed(2)}`
-            if (elSavings) elSavings.textContent = `$${savings.toFixed(2)}`
-          } catch (e) { /* ignore */ }
-
-          // Ensure Income card (if present) is rendered first (top-left)
-          breakdown.sort((a, b) => {
-            const an = (a.name || '').toString().toLowerCase() === 'income'
-            const bn = (b.name || '').toString().toLowerCase() === 'income'
-            if (an && !bn) return -1
-            if (bn && !an) return 1
-            return 0
-          })
-
-          const breakdownContainer = document.getElementById('category-breakdown')
-          function titleCase(s) {
-            if (!s) return ''
-            return s.toString().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-          }
-          breakdownContainer.innerHTML = ''
-          breakdown.forEach(cat => {
-            const card = document.createElement('div')
-            // investments are treated inversely: being under target is 'bad'
-            const rawName = (cat.name || '')
-            const name = rawName.toLowerCase()
-            const displayName = titleCase(rawName)
-            const isInvestment = name.includes('invest')
-            const isIncome = name === 'income'
-            const actual = parseFloat(cat.actual_percentage || 0)
-            const target = parseFloat(cat.target_percentage || 0)
-
-            // Render Income as a neutral grey card and do not apply red/green highlighting
-            if (isIncome) {
-              card.className = 'p-6 h-36 rounded-lg border flex flex-col justify-between bg-gray-200 border-gray-300 select-none'
-              card.innerHTML = `\n                <div class="text-lg font-semibold text-gray-900">${displayName}</div>\n                <div class="flex items-center justify-between">\n                  <div class="text-sm text-gray-700">Total $${(parseFloat(cat.sum) || 0).toFixed(2)}</div>\n                  <div class="text-sm text-gray-500">Income</div>\n                </div>\n                <p class="mt-2 text-xs text-gray-600">This number represents how much money you've made, based on the income/employer keywords in your Income category definition. This represents your paychecks.</p>\n              `
-              card.dataset.categoryId = cat.id
-              card.dataset.categoryName = cat.name
-              card.dataset.actualPercentage = (cat.actual_percentage || 0)
-              card.dataset.targetPercentage = (cat.target_percentage || 0)
-              card.dataset.isInvestment = isInvestment ? '1' : '0'
-              card.dataset.isIncome = '1'
-              card.setAttribute('role', 'button')
-              card.setAttribute('tabindex', '0')
-              breakdownContainer.appendChild(card)
-            } else {
-              // For investments we invert the meaning of over/under
-              let over = actual > target
-              if (isInvestment) { over = actual < target }
-              card.className = 'p-6 h-36 rounded-lg border flex flex-col justify-between transition transform hover:-translate-y-1 hover:shadow-md cursor-pointer ' + (over ? 'border-red-300 bg-red-50 hover:bg-red-100' : 'border-green-300 bg-green-50 hover:bg-green-100')
-              card.innerHTML = `\n                <div class="text-lg font-semibold text-gray-900">${displayName}</div>\n                <div class="flex items-center justify-between">\n                  <div class="text-sm text-gray-700">Actual ${actual.toFixed(1)}%</div>\n                  <div class="text-sm text-gray-700">Target ${target.toFixed(1)}%</div>\n                </div>\n              `
-              // accessibility: make card focusable and role=button
-              card.setAttribute('role', 'button')
-              card.setAttribute('tabindex', '0')
-              card.dataset.categoryId = cat.id
-              card.dataset.categoryName = displayName
-              card.dataset.actualPercentage = (cat.actual_percentage || 0)
-              card.dataset.targetPercentage = (cat.target_percentage || 0)
-              card.dataset.isInvestment = isInvestment ? '1' : '0'
-              card.dataset.isIncome = '0'
-              breakdownContainer.appendChild(card)
-            }
-          })
-
-          // Use event delegation for clicks and keyboard activation (attach once)
-          if (!breakdownContainer.dataset.handlersAttached) {
-            breakdownContainer.addEventListener('click', async (e) => {
-              const card = e.target.closest('[data-category-id]')
-              if (!card) return
-              await handleCardActivation(card)
-            })
-            breakdownContainer.addEventListener('keydown', async (e) => {
-              if (e.key !== 'Enter' && e.key !== ' ') return
-              const card = e.target.closest('[data-category-id]')
-              if (!card) return
-              e.preventDefault()
-              await handleCardActivation(card)
-            })
-            breakdownContainer.dataset.handlersAttached = '1'
-          }
-
-          async function handleCardActivation(card) {
-            console.log('card activated', card.dataset.categoryId)
-            const catId = card.dataset.categoryId
-            const catName = card.dataset.categoryName || 'Category'
-            // color transactions title same as card logic
-            const actual = parseFloat(card.dataset.actualPercentage || 0)
-            const target = parseFloat(card.dataset.targetPercentage || 0)
-            const isInvestment = card.dataset.isInvestment === '1'
-            const isIncome = card.dataset.isIncome === '1' || (card.dataset.categoryName || '').toString().toLowerCase() === 'income'
-            // For Income we do not apply title coloring; use null to indicate no color
-            let over = null
-            if (!isIncome) {
-              if (isInvestment) { over = actual < target }
-              else { over = actual > target }
-            }
-            const titleEl = document.getElementById('transactions-title')
-            // clear previous color classes
-            titleEl.classList.remove('bg-red-50','text-red-700','bg-green-50','text-green-700','px-2','py-1','rounded')
-            if (over !== null) {
-              if (over) {
-                titleEl.classList.add('bg-red-50','text-red-700','px-2','py-1','rounded')
-              } else {
-                titleEl.classList.add('bg-green-50','text-green-700','px-2','py-1','rounded')
-              }
-            }
-            const txUrl = '<%= dashboard_category_transactions_path %>.json?' + formatParams({ category_id: catId, start_date: document.getElementById('filter-start').value, end_date: document.getElementById('filter-end').value })
-            try {
-              const r = await fetch(txUrl)
-              if (!r.ok) throw new Error('Network response was not ok')
-              const j = await r.json()
-              const tbody = document.querySelector('#category-transactions-table tbody')
-              tbody.innerHTML = ''
-              if (!(j.transactions || []).length) {
-                const tr = document.createElement('tr')
-                tr.innerHTML = '<td class="px-3 py-6 text-gray-500" colspan="4">No transactions for this category in the selected range.</td>'
-                tbody.appendChild(tr)
-              }
-              (j.transactions || []).forEach(t => {
-                const tr = document.createElement('tr')
-                tr.className = 'border-t'
-                const date = new Date(t.created_at)
-                tr.innerHTML = `\n                  <td class="px-3 py-2 align-top">${date.toLocaleDateString()}</td>\n                  <td class="px-3 py-2 align-top">${t.name}</td>\n                  <td class="px-3 py-2 align-top">${t.account_name || ''}</td>\n                  <td class="px-3 py-2 align-top">${t.transaction_type ? (t.transaction_type === 'income' ? '<span class="inline-flex items-center px-2 py-1 rounded bg-green-50 text-green-700 text-xs">Income</span>' : '<span class="inline-flex items-center px-2 py-1 rounded bg-red-50 text-red-700 text-xs">Expense</span>') : ''}</td>\n                  <td class="px-3 py-2 text-right font-semibold">$${parseFloat(t.amount).toFixed(2)}</td>\n                `
-                tbody.appendChild(tr)
-              })
-              document.getElementById('transactions-title').textContent = `Transactions — ${catName}`
-              // If Income card was activated, clear any accidental selection so table text doesn't remain highlighted
+            const cats = Array.isArray(body.categories) ? body.categories : []
+            cats.forEach((cat, idx) => {
               try {
-                if (isIncome && window.getSelection) window.getSelection().removeAllRanges()
-              } catch (e) { /* ignore */ }
-              document.getElementById('category-transactions').scrollIntoView({ behavior: 'smooth', block: 'start' })
-            } catch (err) {
-              console.error('failed to fetch category transactions', err)
-              alert('Failed to load transactions for this category. See console for details.')
-            }
+                const isInvestment = (cat.name || '').toString().toLowerCase().includes('invest')
+                const lname = (cat.name || '').toString().toLowerCase()
+                const isIncome = lname === 'income'
+                const isIgnore = lname === 'ignore'
+                const isUnknown = lname === 'unknown'
+
+                // header: category title with target & actual
+                const header = document.createElement('div')
+                header.className = 'w-full py-3 px-2 border-b flex items-center justify-between'
+
+                const left = document.createElement('div')
+                const title = document.createElement('div')
+                title.className = 'text-lg font-semibold'
+                title.textContent = titleCase(cat.name)
+                // apply unique title color per category
+                try {
+                  const clr = colorsForName(cat.name)
+                  title.style.color = clr.titleColor
+                } catch (e) {
+                  title.className += ' text-gray-900'
+                }
+                left.appendChild(title)
+
+                const subtitle = document.createElement('div')
+                subtitle.className = 'text-sm text-gray-600'
+                const tp = (typeof cat.target_percentage !== 'undefined') ? `${parseFloat(cat.target_percentage).toFixed(1)}%` : ''
+                const ap = (typeof cat.actual_percentage !== 'undefined') ? `${parseFloat(cat.actual_percentage).toFixed(1)}%` : ''
+                // For Income, Ignore, and Unknown categories show only total (no target/percent)
+                if (isIncome || isIgnore || isUnknown) {
+                  subtitle.textContent = `Total: ${money(cat.sum || 0)}`
+                } else {
+                  subtitle.textContent = `Target: ${money(cat.target_amount || 0)} (${tp}) — Actual: ${money(cat.sum || 0)} (${ap})`
+                }
+                left.appendChild(subtitle)
+
+                header.appendChild(left)
+
+                // compute hit/miss coloring (don't color income, ignore, or unknown)
+                let headerRight = document.createElement('div')
+                if (!isIncome && !isIgnore && !isUnknown && (cat.target_amount || 0) > 0) {
+                  // use configured comparison rule if present
+                  const comp = cat.target_comparison || 'equal_to'
+                  const actual = parseFloat(cat.sum || 0)
+                  const target = parseFloat(cat.target_amount || 0)
+                  let hit = false
+                  if (comp === 'less_than') {
+                    hit = actual <= target
+                  } else if (comp === 'greater_than') {
+                    hit = actual >= target
+                  } else if (comp === 'equal_to') {
+                    // allow small epsilon
+                    hit = Math.abs(actual - target) < 0.005
+                  } else {
+                    // default behaviour
+                    hit = actual >= target
+                  }
+                  const cls = hit ? 'text-green-700 bg-green-50 px-2 py-1 rounded' : 'text-red-700 bg-red-50 px-2 py-1 rounded'
+                  headerRight.className = cls + ' text-sm'
+                  // Build a human-readable comparison label (e.g. "Less than 50% target")
+                  const pct = (typeof cat.target_percentage !== 'undefined') ? parseFloat(cat.target_percentage) : null
+                  let compLabel = ''
+                  if (comp === 'less_than') compLabel = 'Less than'
+                  else if (comp === 'greater_than') compLabel = 'Greater than'
+                  else if (comp === 'equal_to') compLabel = 'Equal to'
+                  else compLabel = 'Target'
+
+                  let labelText = ''
+                  if (comp === 'not_applicable') {
+                    labelText = 'Not applicable'
+                  } else if (pct !== null && !isNaN(pct)) {
+                    labelText = `${compLabel} ${pct}% target`
+                  } else {
+                    labelText = `${compLabel} target`
+                  }
+
+                  headerRight.textContent = labelText
+                } else if (isIncome) {
+                  headerRight.className = 'text-xs text-gray-500'
+                  headerRight.textContent = 'Income'
+                } else {
+                  headerRight.className = 'text-xs text-gray-500'
+                  headerRight.textContent = ''
+                }
+                header.appendChild(headerRight)
+
+                container.appendChild(header)
+
+                // transactions table for this category
+                const tableWrap = document.createElement('div')
+                tableWrap.className = 'w-full overflow-x-auto mb-4'
+                const table = document.createElement('table')
+                table.className = 'min-w-full text-sm text-left'
+                const thead = document.createElement('thead')
+                thead.innerHTML = `<tr class="text-xs text-gray-500 uppercase"><th class="px-3 py-2">Date</th><th class="px-3 py-2">Name</th><th class="px-3 py-2">Account</th><th class="px-3 py-2">Type</th><th class="px-3 py-2 text-right">Amount</th></tr>`
+                table.appendChild(thead)
+                const tbody = document.createElement('tbody')
+
+                const txs = Array.isArray(cat.transactions) ? cat.transactions : []
+                if (txs.length === 0) {
+                  const tr = document.createElement('tr')
+                  tr.innerHTML = `<td class="px-3 py-6 text-gray-500" colspan="5">No transactions for this category in the selected range.</td>`
+                  tbody.appendChild(tr)
+                } else {
+                  txs.forEach((t, j) => {
+                    try {
+                      const tr = document.createElement('tr')
+                      tr.className = 'border-t'
+                      const date = new Date(t.created_at)
+                      // plain text type (no colored badges)
+                      const typeHtml = t.transaction_type ? (t.transaction_type === 'income' ? 'Income' : 'Expense') : ''
+                      tr.innerHTML = `
+                        <td class="px-3 py-2 align-top">${date.toLocaleDateString()}</td>
+                        <td class="px-3 py-2 align-top">${t.name}</td>
+                        <td class="px-3 py-2 align-top">${t.account_name || ''}</td>
+                        <td class="px-3 py-2 align-top">${typeHtml}</td>
+                        <td class="px-3 py-2 text-right font-semibold">${money(t.amount)}</td>
+                      `
+                      // alternate row colours: white and a light tint of the category colour
+                      try {
+                        const clr = colorsForName(cat.name)
+                        if ((j % 2) === 1) tr.style.backgroundColor = clr.rowLight
+                        else tr.style.backgroundColor = 'white'
+                      } catch (e) {
+                        // ignore
+                      }
+                      tbody.appendChild(tr)
+                    } catch (e) {
+                      console.error('transaction render error', e, t)
+                    }
+                  })
+                }
+
+                table.appendChild(tbody)
+                tableWrap.appendChild(table)
+                container.appendChild(tableWrap)
+              } catch (e) {
+                console.error('category render error', e, cat)
+              }
+            })
+          } catch (e) {
+            console.error('categories rendering failed', e, body && body.categories)
+            const errDiv = document.createElement('div')
+            errDiv.className = 'text-red-600'
+            errDiv.textContent = `Render error: ${e && e.message ? e.message : String(e)}`
+            container.appendChild(errDiv)
           }
+
         } catch (err) {
-          console.error('failed to fetch breakdown', err)
+          console.error('failed to fetch grouped spending breakdown', err)
+          const container = document.getElementById('grouped-container')
+          const msg = (err && err.message) ? err.message : String(err)
+          const status = (err && err.status) ? ` (status ${err.status})` : ''
+          if (container) {
+              // include stack where available to help debugging
+              const stack = err && err.stack ? `\n\nStack:\n${err.stack}` : ''
+              container.innerHTML = `<div class="text-red-600">Failed to load data${status}: ${msg}. Check browser console for more details.<pre class="mt-2 text-xs text-red-600">${stack}</pre></div>`
+          }
         }
       }
 
-      document.getElementById('filter-start').addEventListener('change', fetchBreakdown)
-      document.getElementById('filter-end').addEventListener('change', fetchBreakdown)
-      let activePeriod = null
-      function setActiveButton(id) {
-        ['btn-this-month','btn-last-month','btn-so-far-year'].forEach(b => {
-          const el = document.getElementById(b)
-          if (!el) return
-          if (b === id) {
-            el.classList.add('bg-blue-600','text-white')
-            el.classList.remove('bg-blue-50','text-blue-700')
-          } else {
-            el.classList.remove('bg-blue-600','text-white')
-            el.classList.add('bg-blue-50','text-blue-700')
-          }
-        })
-      }
+      document.getElementById('filter-start').addEventListener('change', fetchGrouped)
+      document.getElementById('filter-end').addEventListener('change', fetchGrouped)
 
       document.getElementById('btn-this-month').addEventListener('click', () => {
         const now = new Date()
@@ -254,9 +266,7 @@
         const m = String(now.getMonth()+1).padStart(2,'0')
         document.getElementById('filter-start').value = `${y}-${m}-01`
         document.getElementById('filter-end').value = `${y}-${m}-${String(now.getDate()).padStart(2,'0')}`
-        activePeriod = 'btn-this-month'
-        setActiveButton(activePeriod)
-        fetchBreakdown()
+        fetchGrouped()
       })
 
       document.getElementById('btn-last-month').addEventListener('click', () => {
@@ -268,9 +278,7 @@
         const endDate = new Date(y, now.getMonth()+1, 0)
         document.getElementById('filter-start').value = start
         document.getElementById('filter-end').value = `${y}-${m}-${String(endDate.getDate()).padStart(2,'0')}`
-        activePeriod = 'btn-last-month'
-        setActiveButton(activePeriod)
-        fetchBreakdown()
+        fetchGrouped()
       })
 
       document.getElementById('btn-so-far-year').addEventListener('click', () => {
@@ -278,27 +286,20 @@
         const y = now.getFullYear()
         document.getElementById('filter-start').value = `${y}-01-01`
         document.getElementById('filter-end').value = `${y}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-        activePeriod = 'btn-so-far-year'
-        setActiveButton(activePeriod)
-        fetchBreakdown()
+        fetchGrouped()
       })
 
-      // export CSV using current filters
+      // export CSV using current filters (keeps existing behaviour)
       document.getElementById('export-spending-plan').addEventListener('click', (e) => {
         const start = document.getElementById('filter-start').value
         const end = document.getElementById('filter-end').value
         const params = formatParams({ start_date: start, end_date: end, include_zero: '1' })
         const url = '<%= spending_breakdown_export_path %>.csv?' + params
-        // open in new tab to trigger download
         window.open(url, '_blank')
       })
 
-      // Note: Close button removed; no-op if not present
-      const closeBtn = document.getElementById('close-transactions')
-      if (closeBtn) closeBtn.addEventListener('click', () => document.getElementById('category-transactions').classList.add('hidden'))
-
       // initial load
-      fetchBreakdown()
+      fetchGrouped()
     })()
   </script>
 </div>

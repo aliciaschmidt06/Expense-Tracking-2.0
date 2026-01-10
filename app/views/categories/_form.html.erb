@@ -36,6 +36,20 @@
                   focus:border-blue-500 focus:ring-blue-500" %>
   </div>
 
+  <!-- Target Comparison -->
+  <div class="flex items-center gap-4">
+    <%= form.label :target_comparison,
+      "Target comparison",
+      class: "w-44 text-sm font-medium text-gray-700" %>
+
+    <%= form.select :target_comparison, options_for_select([
+      ['Equal to', 'equal_to'],
+      ['Less than', 'less_than'],
+      ['Greater than', 'greater_than'],
+      ['Not applicable', 'not_applicable']
+    ], selected: category.target_comparison), {}, class: "flex-1 rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500" %>
+  </div>
+
   <!-- Keywords -->
   <div class="flex items-start gap-4">
     <%= form.label :keywords,

@@ -8,3 +8,19 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+
+/* Global table borders so all tables across the app show 1px borders
+	 Uses a neutral Tailwind gray (similar to gray-200) for consistency with the UI.
+	 border-collapse keeps cell borders tight and consistent. */
+table {
+	border-collapse: collapse;
+}
+
+table, th, td {
+	border: 1px solid rgba(229, 231, 235, 1); /* Tailwind gray-200 */
+}
+
+/* Small padding to match Tailwind default-ish spacing */
+th, td {
+	padding: 0.5rem 0.75rem;
+}

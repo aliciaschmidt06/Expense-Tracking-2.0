@@ -215,19 +215,44 @@ class HomeController < ApplicationController
       start_date ||= (end_date << 11).beginning_of_month.to_date
     end
 
+    # period scope for listing transactions
     period_scope = Transaction.all
     period_scope = period_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
     period_scope = period_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
 
+    # find special categories
+    income_cat = Category.where('LOWER(name) = ?', 'income').first
+    ignore_cat = Category.where('LOWER(name) = ?', 'ignore').first
+    unknown_cat = Category.where('LOWER(name) = ?', 'unknown').first
+
+    # calculation scope: exclude Ignore and Unknown
+    calc_scope = Transaction.all
+    calc_scope = calc_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
+    calc_scope = calc_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
+    calc_scope = calc_scope.where.not(category_id: ignore_cat.id) if ignore_cat.present?
+    calc_scope = calc_scope.where.not(category_id: unknown_cat.id) if unknown_cat.present?
+
+    # base for target math is Income transactions only
+    income_sum = income_cat.present? ? calc_scope.where(category_id: income_cat.id).sum(:amount).to_f : 0.0
+    base_sum = income_sum
+
     total_sum = period_scope.sum(:amount).to_f
 
-    include_zero = params[:include_zero].present?
-    categories_scope = include_zero ? Category.order(:name) : Category.where.not(target_percentage: nil).where('target_percentage > 0').order(:name)
+    # build ordered category list (income first)
+    base_cats = Category.all.to_a
+    base_cats.compact!
+    ordered = []
+    ordered << income_cat if income_cat.present?
+    normal_cats = base_cats.reject { |c| [income_cat&.id, ignore_cat&.id, unknown_cat&.id].compact.include?(c.id) }
+    normal_cats = normal_cats.sort_by { |c| c.name.to_s.downcase }
+    ordered.concat(normal_cats)
+    ordered << ignore_cat if ignore_cat.present?
+    ordered << unknown_cat if unknown_cat.present?
 
     require 'csv'
     csv = CSV.generate(headers: false) do |csv|
       csv << ["Spending Plan"]
-      # print statement date or period
+      # human readable statement date or period
       if start_date && end_date && start_date.month == end_date.month && start_date.year == end_date.year
         csv << ["Statement date: #{start_date.strftime('%B %Y')}"]
       else
@@ -235,15 +260,40 @@ class HomeController < ApplicationController
       end
       csv << []
 
-      categories_scope.each do |c|
+      ordered.each do |c|
+        next unless c
         c_sum = period_scope.where(category_id: c.id).sum(:amount).to_f
-        actual_pct = total_sum > 0 ? (c_sum / total_sum * 100.0) : 0.0
-        target = c.target_percentage.to_f
-        csv << ["#{c.name}: Target #{target.round(2)}%, Actual #{actual_pct.round(2)}%"]
-        csv << ["Date", "Name", "Account", "Amount"]
+
+        # Build subtitle similar to the page
+        lname = c.name.to_s.downcase
+        is_income = lname == 'income'
+        is_ignore = lname == 'ignore'
+        is_unknown = lname == 'unknown'
+
+        if is_income || is_ignore || is_unknown
+          csv << ["#{c.name}: Total #{sprintf('%.2f', c_sum)}"]
+        else
+          target_pct = c.target_percentage.to_f
+          target_amount = base_sum * (target_pct / 100.0)
+          actual_pct = base_sum > 0 ? (c_sum / base_sum * 100.0) : 0.0
+          # include comparison label if present
+          comp = c.respond_to?(:target_comparison) ? c.target_comparison.to_s : 'equal_to'
+          comp_label = case comp
+                       when 'less_than' then 'Less than'
+                       when 'greater_than' then 'Greater than'
+                       when 'equal_to' then 'Equal to'
+                       else 'Target'
+                       end
+          cmp_text = comp == 'not_applicable' ? 'Not applicable' : "#{comp_label} #{target_pct}% target"
+          csv << ["#{c.name}: Target: #{sprintf('%.2f', target_amount)} (#{target_pct.round(2)}%) — Actual: #{sprintf('%.2f', c_sum)} (#{actual_pct.round(2)}%) — #{cmp_text}"]
+        end
+
+        # table header matches page (Date, Name, Account, Type, Amount)
+        csv << ["Date", "Name", "Account", "Type", "Amount"]
         txs = period_scope.where(category_id: c.id).order(created_at: :desc)
         txs.each do |t|
-          csv << [t.created_at.to_date.strftime('%Y-%m-%d'), t.name, t.account_name, sprintf('%.2f', t.amount.to_f)]
+          type_label = t.transaction_type == Transaction.transaction_types[:income] ? 'Income' : 'Expense'
+          csv << [t.created_at.to_date.strftime('%Y-%m-%d'), t.name, t.account_name, type_label, sprintf('%.2f', t.amount.to_f)]
         end
         csv << []
       end
@@ -251,5 +301,104 @@ class HomeController < ApplicationController
 
     filename = "spending_plan_#{Time.current.strftime('%Y%m%d%H%M%S')}.csv"
     send_data csv, filename: filename, type: 'text/csv; charset=utf-8'
+  end
+
+  # GET /spending_breakdown/data.json
+  def spending_breakdown_data
+    # parse dates safely
+    start_date = nil
+    if params[:start_date].present?
+      begin
+        start_date = Date.parse(params[:start_date])
+      rescue ArgumentError, TypeError
+        start_date = nil
+      end
+    end
+
+    end_date = nil
+    if params[:end_date].present?
+      begin
+        end_date = Date.parse(params[:end_date])
+      rescue ArgumentError, TypeError
+        end_date = nil
+      end
+    end
+
+    # sensible defaults: last 12 months
+    if start_date.nil? || end_date.nil?
+      end_date ||= Date.current
+      start_date ||= (end_date << 11).beginning_of_month.to_date
+    end
+
+    # full scope for displaying transaction lists
+    full_scope = Transaction.all
+    full_scope = full_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
+    full_scope = full_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
+
+    # find special categories (case-insensitive)
+    income_cat = Category.where('LOWER(name) = ?', 'income').first
+    ignore_cat = Category.where('LOWER(name) = ?', 'ignore').first
+    unknown_cat = Category.where('LOWER(name) = ?', 'unknown').first
+
+    # calculation scope: exclude Ignore and Unknown categories entirely from calculations
+    calc_scope = Transaction.all
+    calc_scope = calc_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
+    calc_scope = calc_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
+    calc_scope = calc_scope.where.not(category_id: ignore_cat.id) if ignore_cat.present?
+    calc_scope = calc_scope.where.not(category_id: unknown_cat.id) if unknown_cat.present?
+
+    # base amount for targets/percentages must be Income transactions only (per request)
+    income_sum = income_cat.present? ? calc_scope.where(category_id: income_cat.id).sum(:amount).to_f : 0.0
+    base_sum = income_sum
+
+    # still compute total visible sum for display, but don't use it for target math
+    total_sum = full_scope.sum(:amount).to_f
+
+    # Build ordered category list: income first, then normal categories, then ignore & unknown at bottom
+    base_cats = Category.all.to_a
+    base_cats.compact!
+
+    ordered = []
+    ordered << income_cat if income_cat.present?
+
+    normal_cats = base_cats.reject { |c| [income_cat&.id, ignore_cat&.id, unknown_cat&.id].compact.include?(c.id) }
+    normal_cats = normal_cats.sort_by { |c| c.name.to_s.downcase }
+    ordered.concat(normal_cats)
+    ordered << ignore_cat if ignore_cat.present?
+    ordered << unknown_cat if unknown_cat.present?
+
+    cats = ordered.map do |c|
+      next unless c
+      # use full_scope to show transactions for each category (so Ignore/Unknown still list their txs)
+      txs = full_scope.where(category_id: c.id).order(created_at: :desc).map do |t|
+        {
+          id: t.id,
+          name: t.name,
+          amount: t.amount.to_f,
+          transaction_type: t.transaction_type,
+          account_name: t.account_name,
+          created_at: t.created_at
+        }
+      end
+
+      c_sum = txs.sum { |t| t[:amount].to_f }
+      target_pct = c.target_percentage.to_f
+      # target/actual calculations use base_sum (income_sum) per new requirement
+      target_amount = base_sum * (target_pct / 100.0)
+      actual_pct = base_sum > 0 ? (c_sum / base_sum * 100.0) : 0.0
+
+      {
+        id: c.id,
+        name: c.name,
+        target_percentage: target_pct.round(2),
+        target_amount: target_amount.round(2),
+        actual_percentage: actual_pct.round(2),
+        sum: c_sum.round(2),
+        target_comparison: c.respond_to?(:target_comparison) ? c.target_comparison.to_s : 'equal_to',
+        transactions: txs
+      }
+    end.compact
+
+    render json: { total_sum: total_sum.round(2), income_summary: { amount: income_sum.round(2), note: 'based on your Income category (keyword-defined) — calculations use Income only; Ignore/Unknown are excluded' }, categories: cats }
   end
 end
