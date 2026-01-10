@@ -143,21 +143,26 @@ class HomeController < ApplicationController
       cursor = cursor.next_month
     end
 
-  # find special categories robustly (case-insensitive, trimmed)
-  all_cats = Category.all.to_a
-  ignore_ids = all_cats.select { |c| c.name.to_s.downcase.strip == 'ignore' }.map(&:id)
-  unknown_ids = all_cats.select { |c| c.name.to_s.downcase.strip == 'unknown' }.map(&:id)
+  # find special categories robustly (case-insensitive, trimmed) using DB to avoid edge cases
+  special_ids = Category.where("LOWER(TRIM(name)) IN (?)", ['ignore', 'unknown']).pluck(:id)
+
+  # If the user explicitly filtered by one of the special categories, allow showing that category's
+  # transactions — only exclude specials when no explicit special category filter is applied.
+  excluded_ids = if category_id.present? && special_ids.include?(category_id)
+                   []
+                 else
+                   special_ids
+                 end
 
     income_totals = months.map do |m|
-      bucket = txs.select { |t| t.created_at.to_date.beginning_of_month == m && t.transaction_type.to_s == 'income' }
+  bucket = txs.select { |t| t.created_at.to_date.beginning_of_month == m && t.transaction_type.to_s == 'income' && !(excluded_ids.include?(t.category_id)) }
       bucket.sum { |t| (t.amount || 0).to_f }
     end
 
     spend_totals = months.map do |m|
       bucket = txs.select { |t|
         t.created_at.to_date.beginning_of_month == m && t.transaction_type.to_s != 'income' &&
-        !ignore_ids.include?(t.category_id) &&
-        !unknown_ids.include?(t.category_id)
+        !(excluded_ids.include?(t.category_id))
       }
       bucket.sum { |t| (t.amount || 0).to_f }
     end
@@ -167,11 +172,10 @@ class HomeController < ApplicationController
   period_scope = Transaction.all
     period_scope = period_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
     period_scope = period_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
-  # exclude Ignore and Unknown categories from period calculations
-  ignore = Category.where('LOWER(name) = ?', 'ignore').first
-  unknown = Category.where('LOWER(name) = ?', 'unknown').first
-  period_scope = period_scope.where.not(category_id: ignore.id) if ignore.present?
-  period_scope = period_scope.where.not(category_id: unknown.id) if unknown.present?
+  # exclude Ignore and Unknown categories from period calculations (use same special_ids list)
+  if excluded_ids.any?
+    period_scope = period_scope.where.not(category_id: excluded_ids)
+  end
 
     total_sum = period_scope.sum(:amount).to_f
     income_total = period_scope.where(transaction_type: Transaction.transaction_types[:income]).sum(:amount).to_f
@@ -201,6 +205,10 @@ class HomeController < ApplicationController
   def dashboard_category_transactions
     category_id = params[:category_id].present? ? params[:category_id].to_i : nil
 
+    # optional transaction_type filter: 'income' or 'expense'
+    ttype = params[:transaction_type].to_s.downcase
+    ttype = nil unless %w[income expense].include?(ttype)
+
     # parse dates safely (reuse logic)
     start_date = nil
     if params[:start_date].present?
@@ -224,6 +232,10 @@ class HomeController < ApplicationController
     scope = scope.where(category_id: category_id) if category_id.present?
     scope = scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
     scope = scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
+
+    if ttype.present?
+      scope = scope.where(transaction_type: Transaction.transaction_types[ttype.to_sym])
+    end
 
     txs = scope.order(created_at: :desc).limit(1000).map do |t|
       {

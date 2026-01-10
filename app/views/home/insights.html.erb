@@ -38,6 +38,29 @@
           <canvas id="spendingChart" width="800" height="320"></canvas>
         </div>
       </div>
+
+      <!-- Transactions list shown when clicking a bar -->
+      <div id="insights-transactions" class="hidden mt-6 bg-white rounded-lg border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 id="insights-transactions-title" class="text-lg font-medium">Transactions</h3>
+          <button id="insights-transactions-close" class="text-sm text-gray-500 hover:text-gray-700">Close</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table id="insights-transactions-table" class="min-w-full text-sm">
+            <thead>
+              <tr class="text-left text-xs text-gray-500">
+                <th class="px-3 py-2">Date</th>
+                <th class="px-3 py-2">Name</th>
+                <th class="px-3 py-2">Account</th>
+                <th class="px-3 py-2">Type</th>
+                <th class="px-3 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody id="insights-transactions-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -94,6 +117,66 @@
                 responsive: true,
                 scales: { y: { beginAtZero: true } }
               }
+            })
+
+            // handle clicks on bars to fetch transactions for that month/type
+            document.getElementById('spendingChart').addEventListener('click', async function(evt){
+              try {
+                const points = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, false)
+                if (!points || points.length === 0) return
+                const p = points[0]
+                const datasetIndex = p.datasetIndex
+                const index = p.index
+                const label = chart.data.labels[index]
+
+                // map dataset index to transaction_type
+                const ttype = datasetIndex === 0 ? 'income' : 'expense'
+
+                // parse label like 'Dec 2024' -> start/end dates
+                function parseLabelToRange(lbl) {
+                  const parts = lbl.split(' ')
+                  if (parts.length < 2) return null
+                  const monthName = parts[0]
+                  const year = parseInt(parts[1], 10)
+                  const months = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 }
+                  const m = months[monthName.substr(0,3)]
+                  if (m === undefined || Number.isNaN(year)) return null
+                  const start = new Date(year, m, 1)
+                  const end = new Date(year, m+1, 0)
+                  const pad = n => String(n).padStart(2, '0')
+                  return { start: `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`, end: `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}` }
+                }
+
+                const range = parseLabelToRange(label)
+                if (!range) return
+
+                // include category filter if set
+                const category = document.getElementById('filter-category').value
+                const params = { start_date: range.start, end_date: range.end, transaction_type: ttype }
+                if (category) params.category_id = category
+                const url = '<%= dashboard_category_transactions_path %>.json?' + formatParams(params)
+                const res = await fetch(url)
+                const body = await res.json()
+                const rows = body.transactions || []
+
+                const tbody = document.getElementById('insights-transactions-body')
+                tbody.innerHTML = ''
+                rows.forEach(r => {
+                  const tr = document.createElement('tr')
+                  tr.className = 'border-t'
+                  tr.innerHTML = `<td class="px-3 py-2">${new Date(r.created_at).toISOString().slice(0,10)}</td><td class="px-3 py-2">${(r.name || '')}</td><td class="px-3 py-2">${(r.account_name || '')}</td><td class="px-3 py-2">${(r.transaction_type || '')}</td><td class="px-3 py-2 text-right">${(Number(r.amount) || 0).toFixed(2)}</td>`
+                  tbody.appendChild(tr)
+                })
+
+                document.getElementById('insights-transactions-title').textContent = `${ttype.charAt(0).toUpperCase() + ttype.slice(1)} transactions for ${label}`
+                document.getElementById('insights-transactions').classList.remove('hidden')
+              } catch (e) {
+                console.error('Failed to fetch transactions for bar click', e)
+              }
+            })
+
+            document.getElementById('insights-transactions-close').addEventListener('click', function(){
+              document.getElementById('insights-transactions').classList.add('hidden')
             })
           }
         } catch (err) {
