@@ -24,7 +24,7 @@ categories:
       greater_than: 10.0
   vacation:
     keywords:
-      - norwegian cruise line
+      - expedia
     target_percentage:
       less_than: 10.0
   income:

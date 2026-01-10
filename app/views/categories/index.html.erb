@@ -16,14 +16,17 @@
 
     <!-- Upload & Download buttons -->
     <div class="flex items-center space-x-3">
-  <%= link_to "Upload Categories from YAML",
-    new_category_import_path,
-    class: "bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-md
-       hover:bg-green-700 hover:shadow-lg transition" %>
+      <%= link_to "Upload Categories from YAML",
+        new_category_import_path,
+        class: "bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-md hover:bg-green-700 hover:shadow-lg transition" %>
 
-  <%= link_to "Download config.yaml",
-    download_categories_yaml_path,
-    class: "bg-white text-gray-800 px-4 py-2 rounded-lg font-medium border border-gray-200 shadow-sm hover:shadow-md transition" %>
+      <%= link_to "Download current categories.yaml",
+        download_categories_yaml_path,
+        class: "bg-white text-gray-800 px-5 py-2.5 rounded-lg font-medium border border-gray-200 shadow-sm hover:shadow-md transition" %>
+      
+      <%= link_to "Download fresh template",
+        '/categories.template.yaml',
+        class: "bg-white text-gray-800 px-5 py-2.5 rounded-lg font-medium border border-gray-200 shadow-sm hover:shadow-md transition" %>
     </div>
   </div>
 
@@ -41,7 +44,7 @@
     </div>
   <% elsif defined?(@percentages_ok) && @percentages_ok %>
     <div class="mb-6 inline-flex items-center space-x-3 text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
-      <span class="font-semibold">Distribution OK</span>
+      <span class="font-semibold">Your category targets add up correctly</span>
       <span class="text-sm">Total: <%= number_with_precision(@total_percentage, precision: 2) %>%</span>
     </div>
   <% end %>
@@ -121,3 +124,5 @@
     clear.addEventListener('click', function(){ input.value = ''; input.focus(); applyFilter() })
   })()
 </script>
+
+<!-- floating download button removed: download template is now in header -->
