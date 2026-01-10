@@ -50,16 +50,35 @@
     ], selected: category.target_comparison), {}, class: "flex-1 rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500" %>
   </div>
 
-  <!-- Keywords -->
+  <!-- Keywords (tag editor) -->
   <div class="flex items-start gap-4">
     <%= form.label :keywords,
           class: "w-44 pt-2 text-sm font-medium text-gray-700" %>
 
-    <%= form.text_area :keywords,
-          rows: 3,
-          placeholder: "uber, restaurant, coffee",
-          class: "flex-1 rounded-md border border-gray-300 px-3 py-2
-                  focus:border-blue-500 focus:ring-blue-500" %>
+    <div class="flex-1">
+      <div id="keyword-editor" data-initial-tags="<%= j(category.keyword_list.to_json) %>" class="space-y-2">
+        <div id="keyword-chips" class="flex flex-wrap gap-2">
+          <%# Render existing keywords as chips server-side so they are visible even if JS doesn't run immediately %>
+          <% Array(category.keyword_list || []).each_with_index do |kw, idx| %>
+            <% next if kw.to_s.strip.blank? %>
+            <span class="inline-flex items-center gap-2 bg-gray-100 text-sm text-gray-800 rounded-full px-3 py-1" data-server-tag-index="<%= idx %>">
+              <span><%= kw %></span>
+              <button type="button" class="ml-2 text-gray-500 hover:text-gray-700" aria-label="Remove <%= kw %>">&times;</button>
+            </span>
+          <% end %>
+        </div>
+
+        <div class="flex gap-2">
+          <input id="keyword-input" type="text" placeholder="Add a keyword and press Enter or click Add" class="flex-1 rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500" />
+          <button type="button" id="keyword-add" class="px-3 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Add</button>
+        </div>
+
+        <p class="text-xs text-gray-500">Keywords are used to auto-assign transactions. Matching is case-insensitive and will match if the transaction name contains the keyword.</p>
+
+        <!-- store JSON string for controller -->
+        <%= form.hidden_field :keywords, value: (category.keyword_list.present? ? category.keyword_list.to_json : "[]"), id: "category_keywords_input" %>
+      </div>
+    </div>
   </div>
 
   <!-- Actions -->
@@ -73,3 +92,90 @@
   </div>
 
 <% end %>
+<script>
+  (function(){
+    const editor = document.getElementById('keyword-editor');
+    if(!editor) return;
+
+    const chipsContainer = document.getElementById('keyword-chips');
+    const input = document.getElementById('keyword-input');
+    const addBtn = document.getElementById('keyword-add');
+    const hidden = document.getElementById('category_keywords_input');
+
+    let tags = [];
+    try {
+      tags = JSON.parse(editor.dataset.initialTags || '[]');
+      if(!Array.isArray(tags)) tags = [];
+    } catch(e) {
+      tags = [];
+    }
+
+    // Fallback: if parsing failed and there are server-rendered chips, read them
+    if((!tags || tags.length === 0) && chipsContainer.children.length > 0){
+      tags = Array.from(chipsContainer.querySelectorAll('span')).map(s => s.textContent.trim()).filter(Boolean);
+    }
+
+    const normalize = (t) => (t || '').toString().trim();
+
+    function updateHidden(){
+      hidden.value = JSON.stringify(tags.map(t => normalize(t)).filter(t => t.length > 0));
+    }
+
+    function render(){
+      chipsContainer.innerHTML = '';
+      tags.forEach((tag, idx) => {
+        const t = normalize(tag);
+        if(!t) return;
+
+        const chip = document.createElement('span');
+        chip.className = 'inline-flex items-center gap-2 bg-gray-100 text-sm text-gray-800 rounded-full px-3 py-1';
+        chip.setAttribute('data-tag-index', idx);
+
+        const txt = document.createElement('span');
+        txt.textContent = t;
+        chip.appendChild(txt);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ml-2 text-gray-500 hover:text-gray-700';
+        btn.setAttribute('aria-label', `Remove ${t}`);
+        btn.innerHTML = '&times;';
+        btn.addEventListener('click', function(){
+          tags = tags.filter((_, i) => i !== idx);
+          render();
+          updateHidden();
+        });
+
+        chip.appendChild(btn);
+        chipsContainer.appendChild(chip);
+      });
+    }
+
+    function addTagFromInput(){
+      const v = normalize(input.value);
+      if(!v) return;
+      // avoid duplicates case-insensitive
+      const present = tags.some(t => normalize(t).toLowerCase() === v.toLowerCase());
+      if(!present){
+        tags.push(v);
+        updateHidden();
+        render();
+      }
+      input.value = '';
+      input.focus();
+    }
+
+    addBtn.addEventListener('click', addTagFromInput);
+
+    input.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        addTagFromInput();
+      }
+    });
+
+    // initial render
+    render();
+    updateHidden();
+  })();
+</script>

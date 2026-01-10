@@ -71,12 +71,17 @@ class TransactionsController < ApplicationController
     ActiveRecord::Base.transaction do
       @transaction.update!(category: category)
 
-      # Add transaction name to category keywords if not present
+      # Add transaction name snippet (first word, truncated to 12 chars) to category keywords if not present
       kws = category.keyword_list
       name = @transaction.name.to_s.strip
-      unless name.blank? || kws.map(&:downcase).include?(name.downcase)
-        kws << name
-        category.update!(keywords: kws)
+      unless name.blank?
+        first_word = name.split(/\s+/).first || ''
+        snippet = first_word.length <= 12 ? first_word : first_word[0,12]
+        snippet = snippet.to_s.strip
+        unless snippet.blank? || kws.map(&:downcase).include?(snippet.downcase)
+          kws << snippet
+          category.update!(keywords: kws)
+        end
       end
     end
 
@@ -85,8 +90,8 @@ class TransactionsController < ApplicationController
     # uncategorized list HTML so the client can refresh that pane.
     unknown = Category.find_by(name: "Unknown")
     remaining = unknown ? Transaction.where(category: unknown).includes(:category) : Transaction.none
-  # force HTML format when rendering the partial string to avoid lookup for JSON variants
-  remaining_html = render_to_string(partial: 'transactions/uncategorized_list', locals: { transactions: remaining }, formats: [:html])
+    # force HTML format when rendering the partial string to avoid lookup for JSON variants
+    remaining_html = render_to_string(partial: 'transactions/uncategorized_list', locals: { transactions: remaining }, formats: [:html])
 
     render json: { success: true, transaction_id: @transaction.id, category_name: category.name, remaining_html: remaining_html }
   rescue ActiveRecord::RecordNotFound => e
@@ -103,7 +108,6 @@ class TransactionsController < ApplicationController
   def show
     Rails.logger.debug "SHOW ACTION HIT, id=#{params[:id].inspect}"
   end
-
 
   # GET /transactions/new
   def new
