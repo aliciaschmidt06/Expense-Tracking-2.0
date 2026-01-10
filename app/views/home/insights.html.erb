@@ -85,8 +85,28 @@
       <div class="bg-white rounded-lg border border-gray-100 p-6">
         <h2 class="text-lg font-medium mb-4">Spending per month</h2>
         <h3 class="text-medium font-medium"> Click a bar to see transactions</h3>
-        <div class="w-full">
-          <canvas id="spendingChart" width="800" height="320"></canvas>
+        <div class="w-full flex flex-col lg:flex-row items-start lg:items-stretch gap-6">
+          <div class="flex-1">
+            <canvas id="spendingChart" width="800" height="320"></canvas>
+          </div>
+
+          <!-- Right column: stacked average tiles -->
+          <div id="insights-averages" class="w-full lg:w-64 flex flex-col space-y-3 mt-4 lg:mt-0">
+            <div class="bg-gray-50 p-4 rounded-lg text-center">
+              <div class="text-sm text-gray-500">Avg Monthly Income</div>
+              <div id="avg-income" class="text-2xl font-bold text-green-700">$0.00</div>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-lg text-center">
+              <div class="text-sm text-gray-500">Avg Monthly Spend</div>
+              <div id="avg-spend" class="text-2xl font-bold text-blue-700">$0.00</div>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-lg text-center">
+              <div class="text-sm text-gray-500">Avg Money left over</div>
+              <div id="avg-leftover" class="text-2xl font-bold text-gray-900">$0.00</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -306,6 +326,27 @@
       }
 
       function renderTiles(data) {
+        // Averages: compute from monthly series when present
+        try {
+          const labels = data.labels || []
+          const incomeArr = data.income || []
+          const spendArr = data.spend || []
+          const n = (labels && labels.length) ? labels.length : Math.max(incomeArr.length, spendArr.length, 1)
+          const sum = arr => (Array.isArray(arr) ? arr.reduce((a,b) => a + (Number(b) || 0), 0) : 0)
+          const avgIncome = n > 0 ? (sum(incomeArr) / n) : 0
+          const avgSpend = n > 0 ? (sum(spendArr) / n) : 0
+          const avgLeft = avgIncome - avgSpend
+          const elInc = document.getElementById('avg-income')
+          const elSp = document.getElementById('avg-spend')
+          const elLeft = document.getElementById('avg-leftover')
+          if (elInc) elInc.textContent = formatCurrency(avgIncome)
+          if (elSp) elSp.textContent = formatCurrency(avgSpend)
+          if (elLeft) elLeft.textContent = formatCurrency(avgLeft)
+        } catch (e) {
+          // ignore and continue
+          console.error('Failed to render averages', e)
+        }
+
         // Subscriptions
         const subs = data.subscriptions || []
         const subsEl = document.getElementById('subscriptions-list')
