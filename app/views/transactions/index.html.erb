@@ -25,43 +25,43 @@
     </div>
   </div>
 
-  <!-- Filters: search, date range, sort, group -->
+  <!-- Filters: search, smart month, sort, category, account -->
   <div class="mb-6 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-    <%= form_with url: transactions_path, method: :get, local: true, class: "space-y-4" do |f| %>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
+    <%= form_with(url: transactions_path, method: :get, local: true, html: { id: 'transactions-filters-form' }, class: "space-y-4") do |f| %>
+      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div class="p-3 rounded border border-gray-200 bg-gray-50">
           <%= f.label :q, "Search name", class: "text-sm font-medium text-gray-700" %>
-          <%= f.text_field :q, value: params[:q], placeholder: "Search transactions...", class: "mt-1 block w-full max-w-sm rounded-md border-gray-300 px-3 py-2" %>
+          <%= f.text_field :q, value: params[:q], placeholder: "Search transactions...", class: "mt-1 block w-full rounded-md border-gray-300 px-3 py-2" %>
         </div>
 
-        <div>
+        <div class="p-3 rounded border border-gray-200 bg-gray-50">
           <%= f.label :category_id, "Category", class: "text-sm font-medium text-gray-700" %>
-          <%= f.select :category_id, options_for_select([["All categories",""]] + @categories.map { |c| [c.name, c.id] }, params[:category_id]), {}, class: "mt-1 block max-w-sm rounded-md border-gray-300 px-3 py-2" %>
+          <%= f.select :category_id, options_for_select([["All categories",""]] + @categories.map { |c| [c.name, c.id] }, params[:category_id]), {}, class: "mt-1 block w-full rounded-md border-gray-300 px-3 py-2" %>
         </div>
-        <div>
+
+        <div class="p-3 rounded border border-gray-200 bg-gray-50">
           <%= f.label :account_name, "Account", class: "text-sm font-medium text-gray-700" %>
-          <%= f.select :account_name, options_for_select([["All accounts",""]] + (@accounts || []).map { |a| [a, a] }, params[:account_name]), {}, class: "mt-1 block max-w-sm rounded-md border-gray-300 px-3 py-2" %>
+          <%= f.select :account_name, options_for_select([["All accounts",""]] + (@accounts || []).map { |a| [a, a] }, params[:account_name]), {}, class: "mt-1 block w-full rounded-md border-gray-300 px-3 py-2" %>
+        </div>
+
+        <div class="p-3 rounded border border-gray-200 bg-gray-50">
+          <%= f.label :month_text, "Month (smart)", class: "text-sm font-medium text-gray-700" %>
+          <%= text_field_tag :month_text, params[:month_text], placeholder: "e.g. Dec 2024", class: "mt-1 block w-full rounded-md border-gray-300 px-3 py-2", id: 'transactions-month-text' %>
+          <div id="transactions-month-error" class="text-xs text-red-600 mt-1 hidden"></div>
+          <%# hidden start/end so server receives same params %>
+          <%= f.hidden_field :start_date, value: params[:start_date], id: 'transactions-start-date' %>
+          <%= f.hidden_field :end_date, value: params[:end_date], id: 'transactions-end-date' %>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-        <div>
-          <%= f.label :start_date, "Start date", class: "text-sm font-medium text-gray-700" %>
-          <%= f.date_field :start_date, value: params[:start_date], class: "mt-1 block w-full max-w-xs rounded-md border-gray-300 px-3 py-2" %>
-        </div>
-
-        <div>
-          <%= f.label :end_date, "End date", class: "text-sm font-medium text-gray-700" %>
-          <%= f.date_field :end_date, value: params[:end_date], class: "mt-1 block w-full max-w-xs rounded-md border-gray-300 px-3 py-2" %>
-        </div>
-
-        <div>
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div class="md:col-span-2">
           <%= f.label :sort, "Order", class: "text-sm font-medium text-gray-700" %>
-          <%= f.select :sort, options_for_select([["Newest first","desc"],["Oldest first","asc"]], params[:sort] || "desc"), {}, class: "mt-1 block max-w-xs rounded-md border-gray-300 px-3 py-2" %>
+          <%= f.select :sort, options_for_select([["Newest first","desc"],["Oldest first","asc"]], params[:sort] || "desc"), {}, class: "mt-1 block w-full rounded-md border-gray-300 px-3 py-2" %>
         </div>
 
-        <div class="">
-          <%= f.submit "Apply", class: "w-full px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" %>
+        <div>
+          <%= f.submit "Apply", class: "w-full px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700", id: 'transactions-apply' %>
         </div>
       </div>
     <% end %>
@@ -88,3 +88,71 @@
   </div>
 
 </div>
+
+<script>
+  // parse flexible month/year text like "Dec 2024", "dec 24", "12/2024" -> returns { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' } or null
+  function parseMonthYear(input) {
+    if (!input) return null
+    const s = input.toString().trim().toLowerCase()
+    const months = { jan:0, january:0, feb:1, february:1, mar:2, march:2, apr:3, april:3, may:4, jun:5, june:5, jul:6, july:6, aug:7, august:7, sep:8, sept:8, september:8, oct:9, october:9, nov:10, november:10, dec:11, december:11 }
+
+    // month name + year (e.g. "dec 2024" or "dec-24")
+    let m = null, y = null
+    let m1 = s.match(/^([a-z]{3,9})[\.\-\s]*(\d{2,4})$/i)
+    if (m1) {
+      const mon = m1[1].toLowerCase()
+      if (months.hasOwnProperty(mon)) m = months[mon]
+      else {
+        const ab = mon.substr(0,3)
+        if (months.hasOwnProperty(ab)) m = months[ab]
+      }
+      y = parseInt(m1[2], 10)
+    }
+
+    // numeric month/year like 12/2024 or 12-24
+    if (m === null) {
+      let m2 = s.match(/^(\d{1,2})[\/\-](\d{2,4})$/)
+      if (m2) {
+        const mm = parseInt(m2[1], 10)
+        if (mm >= 1 && mm <= 12) m = mm - 1
+        y = parseInt(m2[2], 10)
+      }
+    }
+
+    if (m === null || !y) return null
+
+    // two-digit year heuristic -> map to 2000-2099
+    if (y < 100) y = 2000 + y
+
+    try {
+      const start = new Date(y, m, 1)
+      const end = new Date(y, m + 1, 0)
+      const pad = n => String(n).padStart(2, '0')
+      const startStr = `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`
+      const endStr = `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`
+      return { start: startStr, end: endStr }
+    } catch (e) {
+      return null
+    }
+  }
+
+  document.getElementById('transactions-filters-form').addEventListener('submit', function(e){
+    const text = document.getElementById('transactions-month-text').value
+    if (text && text.trim() !== '') {
+      const r = parseMonthYear(text)
+      if (!r) {
+        e.preventDefault()
+        const el = document.getElementById('transactions-month-error')
+        if (el) { el.textContent = 'Could not parse month/year. Try "Dec 2024" or "12/2024"'; el.classList.remove('hidden') }
+        setTimeout(()=>{ if (el) { el.classList.add('hidden'); el.textContent = '' } }, 4000)
+        return false
+      }
+      // set hidden inputs
+      const startIn = document.getElementById('transactions-start-date')
+      const endIn = document.getElementById('transactions-end-date')
+      if (startIn) startIn.value = r.start
+      if (endIn) endIn.value = r.end
+    }
+    return true
+  })
+</script>

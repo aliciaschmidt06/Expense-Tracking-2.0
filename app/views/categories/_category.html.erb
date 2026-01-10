@@ -27,9 +27,20 @@
 
     <div class="bg-gray-50 rounded-lg px-4 py-3">
       <p class="text-gray-500">Keywords</p>
-      <p class="font-medium text-gray-800 truncate">
-        <%= category.keywords.presence || "—" %>
-      </p>
+      <% full_keywords = category.keywords.to_s.presence || "—" %>
+      <% preview = truncate(full_keywords, length: 80) %>
+
+      <p class="font-medium text-gray-800" data-keywords-preview><%= preview %></p>
+      <p class="font-medium text-gray-800 hidden break-words" data-keywords-full><%= full_keywords %></p>
+
+      <% if full_keywords.present? && full_keywords.length > 80 %>
+  <button type="button"
+    class="mt-2 text-sm text-blue-600 hover:underline"
+    aria-expanded="false"
+    onclick="(function(btn){const root = btn.closest('.space-y-4'); if(!root) return; const pv = root.querySelector('[data-keywords-preview]'); const full = root.querySelector('[data-keywords-full]'); const expanded = full.classList.contains('hidden') === false; if(!expanded){ full.classList.remove('hidden'); pv.classList.add('hidden'); btn.textContent = 'Hide keywords'; btn.setAttribute('aria-expanded','true'); } else { full.classList.add('hidden'); pv.classList.remove('hidden'); btn.textContent = 'Show keywords'; btn.setAttribute('aria-expanded','false'); } })(this)">
+          Show keywords
+        </button>
+      <% end %>
     </div>
   </div>
 

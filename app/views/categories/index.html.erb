@@ -46,6 +46,16 @@
     </div>
   <% end %>
 
+  <!-- Search box for keywords / category name -->
+  <div class="mb-6">
+    <label for="categories-search" class="block text-sm font-medium text-gray-700 mb-2">Search categories / keywords</label>
+    <div class="flex items-center space-x-2">
+      <input id="categories-search" type="search" placeholder="Search keywords or category name..." class="block w-full rounded-md border-gray-300 px-3 py-2" />
+      <button id="categories-search-clear" type="button" class="px-3 py-2 bg-gray-100 rounded-md text-sm text-gray-700 hover:bg-gray-200">Clear</button>
+    </div>
+    <div id="categories-no-results" class="hidden mt-2 text-sm text-gray-600">No categories match your search.</div>
+  </div>
+
   <!-- Categories grid -->
   <div id="categories" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     <% @categories.each do |category| %>
@@ -64,3 +74,50 @@
   </div>
 
 </div>
+
+<script>
+  (function(){
+    const input = document.getElementById('categories-search')
+    const clear = document.getElementById('categories-search-clear')
+    const noResults = document.getElementById('categories-no-results')
+    if (!input) return
+
+    function normalize(s){ return (s||'').toString().toLowerCase().trim() }
+
+    function applyFilter(){
+      const q = normalize(input.value)
+      const grid = document.getElementById('categories')
+      if (!grid) return
+      const cards = Array.from(grid.children)
+      let any = false
+
+      cards.forEach(card => {
+        const preview = card.querySelector('[data-keywords-preview]')
+        const full = card.querySelector('[data-keywords-full]')
+        const nameEl = card.querySelector('h2')
+        const name = normalize(nameEl && nameEl.textContent)
+        const kw = normalize((full && full.textContent) || (preview && preview.textContent) || '')
+
+        if (!q || name.indexOf(q) !== -1 || kw.indexOf(q) !== -1) {
+          card.style.display = ''
+          // highlight match
+          if (q && (name.indexOf(q) !== -1 || kw.indexOf(q) !== -1)) {
+            card.classList.add('ring-2','ring-indigo-200')
+          } else {
+            card.classList.remove('ring-2','ring-indigo-200')
+          }
+          any = true
+        } else {
+          card.style.display = 'none'
+          card.classList.remove('ring-2','ring-indigo-200')
+        }
+      })
+
+      if (!any) noResults.classList.remove('hidden')
+      else noResults.classList.add('hidden')
+    }
+
+    input.addEventListener('input', applyFilter)
+    clear.addEventListener('click', function(){ input.value = ''; input.focus(); applyFilter() })
+  })()
+</script>
