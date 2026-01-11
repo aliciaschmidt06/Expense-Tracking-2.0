@@ -30,11 +30,6 @@ Rails.application.routes.draw do
   resources :category_imports, only: [:new, :create]
   resources :imports, only: [:new] do
     post :transactions, on: :collection
-    collection do
-      get :duplicates
-      post :resolve_duplicate
-      post :finish_import
-    end
   end
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
