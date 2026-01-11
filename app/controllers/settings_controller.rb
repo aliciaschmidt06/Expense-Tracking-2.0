@@ -5,7 +5,24 @@ class SettingsController < ApplicationController
 
   def clear_transactions
     Transaction.delete_all
-    flash[:notice] = 'All transactions have been deleted.'
+
+    # Also remove any persisted upload history so the Upload page reflects
+    # the fact there are no transactions. This prevents confusing UI where
+    # old import records reappear after a fresh upload.
+    begin
+      TransactionImport.delete_all
+    rescue => e
+      Rails.logger.warn "Failed to clear TransactionImport records: #{e.message}"
+    end
+
+    # Clear any in-progress import session/cache state
+    if session[:import_duplicates_key].present?
+      Rails.cache.delete(session.delete(:import_duplicates_key))
+    end
+    session.delete(:import_duplicates)
+    session.delete(:import_meta)
+
+    flash[:notice] = 'All transactions and upload history have been deleted.'
     redirect_to settings_path
   end
 

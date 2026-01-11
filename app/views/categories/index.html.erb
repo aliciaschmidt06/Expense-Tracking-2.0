@@ -2,11 +2,8 @@
 
 <div class="min-h-screen w-full bg-gray-50 px-12 py-10">
 
-  <% if notice.present? %>
-    <div class="mb-6 rounded-lg bg-green-50 border border-green-200 text-green-700 px-4 py-3 shadow-sm">
-      <%= notice %>
-    </div>
-  <% end %>
+  <%# Notifications are rendered in the application layout; avoid duplicating
+      them here to prevent showing the same notice twice. %>
 
   <!-- Header with title and upload button -->
   <div class="flex flex-col md:flex-row items-center justify-between mb-8">

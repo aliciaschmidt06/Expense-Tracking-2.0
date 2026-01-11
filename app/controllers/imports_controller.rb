@@ -1,9 +1,17 @@
 # app/controllers/imports_controller.rb
 require "csv"
+require 'securerandom'
 
 class ImportsController < ApplicationController
   def new
-    @recent_imports = TransactionImport.order(created_at: :desc).limit(10)
+    # Only show recent imports if there are any transactions in the system.
+    # When all transactions are deleted we don't want to display a history
+    # of previous imports because it can be confusing (no transactions exist).
+    if Transaction.exists?
+      @recent_imports = TransactionImport.order(created_at: :desc).limit(10)
+    else
+      @recent_imports = []
+    end
   end
 
   def transactions
@@ -18,14 +26,23 @@ class ImportsController < ApplicationController
       redirect_to new_import_path, alert: "Account name is required" and return
     end
 
-  unknown_category = Category.find_or_create_by!(name: "Unknown")
-  categories = Category.all.to_a
+    # Set up helpers and record for this import
+    unknown_category = Category.find_or_create_by!(name: "Unknown")
+    categories = Category.all.to_a
 
-  created_count = 0
-  skipped_count = 0
-  duplicates = []
+    created_count = 0
+    skipped_count = 0
+    sequence = 0
 
-    CSV.foreach(file.path) do |row|
+    # Create an import/session record we can tag transactions with
+    begin
+      tx_import = TransactionImport.create!(account_name: account_name, filename: file.respond_to?(:original_filename) ? file.original_filename : nil, created_count: 0, skipped_count: 0)
+    rescue => e
+      Rails.logger.warn("Failed to create TransactionImport at start of import: #{e.message}")
+      tx_import = nil
+    end
+
+    CSV.foreach(file.path).with_index(1) do |row, row_number|
       date, description, expense, income, _card = row
       amount_raw = expense.presence || income.presence
       next unless amount_raw
@@ -43,42 +60,56 @@ class ImportsController < ApplicationController
         categories.find { |cat| cat.keyword_list.any? { |k| description.to_s.downcase.include?(k.downcase) } } ||
         unknown_category
 
-      # Compute UID to avoid duplicates: based on datetime, amount, and description
-      uid = Transaction.generate_uid(name: description, amount: amount_value, datetime: parsed_date || Time.current)
+      # Compute content UID (based on date, name, amounts) used for cross-session duplicate detection
+      date_part = parsed_date ? parsed_date.to_date : Time.current.to_date
+      amount_out = transaction_type == "expense" ? amount_value : 0
+      amount_in = transaction_type == "income" ? amount_value : 0
+      content_uid = Transaction.generate_uid(name: description, date: date_part, amount_out: amount_out, amount_in: amount_in)
 
-      # If a transaction with same UID already exists, record as a potential duplicate
-      if Transaction.exists?(uid: uid)
-        duplicates << {
-          uid: uid,
-          name: description,
-          amount: amount_value,
-          transaction_type: transaction_type,
-          account_name: account_name,
-          category_id: category.id,
-          category_name: category.name,
-          created_at: parsed_date&.to_s,
-          existing_transaction_id: Transaction.find_by(uid: uid)&.id
-        }
+      # If another session (import) for the same account already contains this content, skip it
+      if Transaction.where(content_uid: content_uid, account_name: account_name).where.not(transaction_import_id: tx_import&.id).exists?
+        Rails.logger.warn({ event: "import_skip_cross_session_duplicate", row: row_number, uid: content_uid, account: account_name, name: description.to_s }.to_json)
+        skipped_count += 1
         next
       end
 
-      Transaction.create!(
-        name: description,
-        amount: amount_value,
-        transaction_type: transaction_type,
-        account_name: account_name,
-        category: category,
-        created_at: parsed_date,
-        uid: uid
-      )
-      created_count += 1
-    end
+      # Create a stored UID unique in the DB by including the import id and a sequence number
+      created = false
+      attempt = 0
+      while !created && attempt < 5
+        attempt += 1
+        sequence += 1
+        stored_uid = "#{content_uid}-i#{tx_import&.id || 'local'}-s#{sequence}"
+        begin
+          Transaction.create!(
+            name: description,
+            amount: amount_value,
+            transaction_type: transaction_type,
+            account_name: account_name,
+            category: category,
+            created_at: parsed_date,
+            uid: stored_uid,
+            content_uid: content_uid,
+            transaction_import_id: tx_import&.id,
+            import_sequence: sequence
+          )
+          created = true
+          created_count += 1
+        rescue ActiveRecord::RecordInvalid => e
+          # Collision on generated stored UID (very unlikely) — retry with next sequence
+          if e.message =~ /Uid has already been taken/i
+            Rails.logger.warn("UID collision creating stored_uid=#{stored_uid}, retrying (attempt=#{attempt})")
+            next
+          else
+            raise
+          end
+        end
+      end
 
-    # If there are duplicates, store them in session and redirect to the duplicates review page
-    if duplicates.any?
-      session[:import_duplicates] = duplicates
-      session[:import_meta] = { account_name: account_name, filename: file.respond_to?(:original_filename) ? file.original_filename : nil, created_count: created_count, skipped_count: skipped_count }
-      redirect_to duplicates_imports_path and return
+      unless created
+        Rails.logger.warn({ event: "import_failed_create", row: row_number, uid: content_uid }.to_json)
+        skipped_count += 1
+      end
     end
 
     # No duplicates -> record the import and redirect back
@@ -89,17 +120,28 @@ class ImportsController < ApplicationController
     notice_msg += " — " + details.join(', ') unless details.empty?
 
     begin
-      TransactionImport.create!(account_name: account_name, filename: file.respond_to?(:original_filename) ? file.original_filename : nil, created_count: created_count, skipped_count: skipped_count)
+      if tx_import
+        tx_import.update!(created_count: created_count, skipped_count: skipped_count)
+      else
+        TransactionImport.create!(account_name: account_name, filename: file.respond_to?(:original_filename) ? file.original_filename : nil, created_count: created_count, skipped_count: skipped_count)
+      end
     rescue => e
-      Rails.logger.warn "Failed to create TransactionImport record: #{e.message}"
+      Rails.logger.warn "Failed to persist TransactionImport record: #{e.message}"
     end
 
-    redirect_to transactions_path, notice: notice_msg
+    # Redirect back to the Upload page so the user sees the success message
+    # and the recent uploads table on the same page.
+    redirect_to new_import_path, notice: notice_msg
   end
 
   # GET /imports/duplicates
   def duplicates
-    @duplicates = session[:import_duplicates] || []
+    # prefer the server-side cache key to avoid cookie overflow; fall back to old session storage for compatibility
+    if session[:import_duplicates_key].present?
+      @duplicates = Rails.cache.read(session[:import_duplicates_key]) || []
+    else
+      @duplicates = session[:import_duplicates] || []
+    end
     @meta = session[:import_meta] || {}
     render :duplicates
   end
@@ -107,9 +149,16 @@ class ImportsController < ApplicationController
   # POST /imports/resolve_duplicate
   # params: index (integer), decision ('keep' or 'ignore')
   def resolve_duplicate
-  uid = params[:uid].to_s
-  decision = params[:decision].to_s
-  duplicates = session[:import_duplicates] || []
+    uid = params[:uid].to_s
+    decision = params[:decision].to_s
+
+    # load duplicates from cache if available, otherwise fall back to session
+    duplicates = if session[:import_duplicates_key].present?
+      Rails.cache.read(session[:import_duplicates_key]) || []
+    else
+      session[:import_duplicates] || []
+    end
+
     meta = session[:import_meta] || { 'created_count' => 0, 'skipped_count' => 0 }
 
     item = duplicates.find { |d| d['uid'].to_s == uid }
@@ -118,16 +167,17 @@ class ImportsController < ApplicationController
     end
 
     if decision == 'keep'
-      # create transaction only if UID still doesn't exist
       unless Transaction.exists?(uid: item['uid'])
+        incoming = item['incoming'] || item
         tx = Transaction.create(
-          name: item['name'],
-          amount: item['amount'],
-          transaction_type: item['transaction_type'],
-          account_name: item['account_name'],
-          category_id: item['category_id'],
-          created_at: item['created_at'],
-          uid: item['uid']
+          name: incoming['name'],
+          amount: incoming['amount'],
+          transaction_type: incoming['transaction_type'],
+          account_name: incoming['account_name'],
+          category_id: incoming['category_id'],
+          created_at: incoming['created_at'],
+          uid: item['uid'],
+          transaction_import_id: meta['transaction_import_id']
         )
         meta['created_count'] = (meta['created_count'] || 0) + (tx.persisted? ? 1 : 0)
       end
@@ -136,9 +186,16 @@ class ImportsController < ApplicationController
       meta['skipped_count'] = (meta['skipped_count'] || 0) + 1
     end
 
-  # remove the processed item
-  duplicates = duplicates.reject { |d| d['uid'].to_s == uid }
-    session[:import_duplicates] = duplicates
+    # remove the processed item
+    duplicates = duplicates.reject { |d| d['uid'].to_s == uid }
+
+    # persist back to cache or session depending on where it came from
+    if session[:import_duplicates_key].present?
+      Rails.cache.write(session[:import_duplicates_key], duplicates, expires_in: 1.hour)
+    else
+      session[:import_duplicates] = duplicates
+    end
+
     session[:import_meta] = meta
 
     render json: { remaining: duplicates.length, meta: meta }
@@ -147,9 +204,24 @@ class ImportsController < ApplicationController
   # POST /imports/finish_import
   def finish_import
     meta = session.delete(:import_meta) || {}
+    # clear cached duplicates if present
+    if session[:import_duplicates_key].present?
+      Rails.cache.delete(session.delete(:import_duplicates_key))
+    else
+      session.delete(:import_duplicates)
+    end
     # persist TransactionImport record
     begin
-      TransactionImport.create!(account_name: meta['account_name'], filename: meta['filename'], created_count: meta['created_count'] || 0, skipped_count: meta['skipped_count'] || 0)
+      if meta['transaction_import_id']
+        tx_import = TransactionImport.find_by(id: meta['transaction_import_id'])
+        if tx_import
+          tx_import.update!(created_count: meta['created_count'] || 0, skipped_count: meta['skipped_count'] || 0)
+        else
+          TransactionImport.create!(account_name: meta['account_name'], filename: meta['filename'], created_count: meta['created_count'] || 0, skipped_count: meta['skipped_count'] || 0)
+        end
+      else
+        TransactionImport.create!(account_name: meta['account_name'], filename: meta['filename'], created_count: meta['created_count'] || 0, skipped_count: meta['skipped_count'] || 0)
+      end
     rescue => e
       Rails.logger.warn "Failed to create TransactionImport record: #{e.message}"
     end

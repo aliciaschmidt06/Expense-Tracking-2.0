@@ -46,8 +46,10 @@ class CategoryImportsController < ApplicationController
         end
       end
 
-      flash[:import_total] = total_percentage
-      flash[:import_total_ok] = (total_percentage <= 100.0)
+  # total_percentage is computed for validation but we don't expose
+  # it via individual flash keys (they produced incidental flash output
+  # like "100, true, ..."). The categories index computes its own
+  # totals, so avoid polluting flash here.
 
       if yaml_data["categories"].present?
         yaml_data["categories"].each do |name, details|

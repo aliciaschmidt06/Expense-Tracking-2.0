@@ -51,10 +51,21 @@
         <p data-dropzone-target="filename" class="mt-2 text-sm text-gray-700"></p>
       </div>
 
-      <%= f.submit "Import Transactions",
-            class: "w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700" %>
+      <div class="flex flex-col md:flex-row md:items-center md:space-x-4">
+        <div class="w-full md:w-1/2">
+          <%= f.submit "Import Transactions",
+                class: "w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700" %>
+        </div>
 
-    <% end %> 
+        <div class="w-full md:w-1/2 mt-3 md:mt-0 flex md:justify-end">
+          <%= link_to "Upload Categories (YAML)",
+                new_category_import_path,
+                class: "inline-flex items-center justify-center w-full md:w-auto px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700" %>
+        </div>
+      </div>
+
+    <% end %>
 
   </header>
+
 </div>
