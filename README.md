@@ -7,6 +7,6 @@ Expense-Tracking-2.0 is a small self-hosted Rails application to help you import
 
 0. Open a terminal 
 1. git clone repo
-2. cd expense-tracking-2.0
+2. cd Expense-Tracking-2.0
 3. docker-compose up --build 
 4. Access app 
