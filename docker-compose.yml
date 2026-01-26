@@ -1,0 +1,16 @@
+services:
+  web:
+    image: expense_tracking_2.0
+    build: .
+    container_name: expense_tracking_2.0
+    ports:
+      - "8080:80"
+    environment:
+      SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
+      APP_SECRET: "${APP_SECRET}"
+    volumes:
+      - expense_db:/rails/db
+    restart: unless-stopped
+
+volumes:
+  expense_db:
