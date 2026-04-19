@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  get "auto_uploads/index"
   get "category_imports/new"
   get "category_imports/create"
   root "home#index"
@@ -31,6 +32,10 @@ Rails.application.routes.draw do
   resources :imports, only: [:new] do
     post :transactions, on: :collection
   end
+
+  # Auto uploads
+  get 'auto_uploads', to: 'auto_uploads#index', as: 'auto_uploads'
+  post 'auto_uploads/update_folder', to: 'auto_uploads#update_folder', as: 'update_auto_upload_folder'
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.

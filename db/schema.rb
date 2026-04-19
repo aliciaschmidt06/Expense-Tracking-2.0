@@ -10,7 +10,17 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_10_133000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_19_184850) do
+  create_table "auto_upload_histories", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.string "file_name"
+    t.string "file_path"
+    t.string "status"
+    t.datetime "updated_at", null: false
+    t.datetime "uploaded_at"
+  end
+
   create_table "categories", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "keywords"
@@ -18,6 +28,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_10_133000) do
     t.string "target_comparison"
     t.float "target_percentage"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "settings", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "key"
+    t.datetime "updated_at", null: false
+    t.string "value"
   end
 
   create_table "transaction_imports", force: :cascade do |t|
