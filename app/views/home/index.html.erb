@@ -11,85 +11,76 @@
           <p class="mt-2 text-gray-600">You're all set. You can add more categories, edit existing ones, or explore Insights and the Spending Breakdown.</p>
         </div>
 
-  <div class="mt-6 md:flex md:items-stretch md:justify-between">
-          <div class="md:w-2/3 h-full">
-            <div class="mt-0 grid sm:grid-cols-2 gap-4">
-              <div class="p-6 bg-gray-50 rounded-lg text-center">
-                <div class="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                  <span>Transactions</span>
-                  <% if @has_transactions %>
-                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                  <% end %>
+  <div class="mt-6 grid gap-4 lg:grid-cols-2">
+            <div class="p-6 bg-gray-50 rounded-lg">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <div class="text-sm font-medium text-gray-500">Step 1</div>
+                  <h3 class="mt-2 text-xl font-semibold text-gray-900">Transactions</h3>
                 </div>
-                <h3 class="mt-2 font-semibold text-gray-900">Transactions uploaded</h3>
-                <p class="mt-2 text-sm text-gray-600">You've uploaded transactions — great. Import more if needed.</p>
-                <div class="mt-4">
-                  <% if @has_transactions %>
-                    <%= link_to "View transactions", transactions_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
-                    <% if @unknown_transactions_count && @unknown_transactions_count > 0 %>
-                      <div class="mt-2">
-                        <%= link_to "Review uncategorized (#{@unknown_transactions_count})", uncategorized_transactions_path, class: "inline-flex items-center justify-center w-full px-3 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 text-sm" %>
-                      </div>
+                <details class="text-right">
+                  <summary class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m0-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z"></path></svg>
+                    <span class="ml-2">Help</span>
+                  </summary>
+                  <p class="mt-2 text-sm text-gray-600">This shows how many transactions are currently imported and the date range covered by your data. Import more transactions to grow the reporting period.</p>
+                </details>
+              </div>
+              <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
+                  <div class="text-xs uppercase tracking-wide text-gray-500">Total</div>
+                  <div class="mt-2 text-3xl font-semibold text-gray-900"><%= @transactions_count %></div>
+                </div>
+                <div class="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
+                  <div class="text-xs uppercase tracking-wide text-gray-500">Period</div>
+                  <div class="mt-2 text-lg font-semibold text-gray-900">
+                    <% if @range_start && @range_end %>
+                      <%= @range_start.strftime('%b %-d, %Y') %> – <%= @range_end.strftime('%b %-d, %Y') %>
+                    <% else %>
+                      No data yet
                     <% end %>
-                  <% else %>
-                    <%= link_to "Import transactions", new_import_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
-                  <% end %>
+                  </div>
                 </div>
               </div>
-
-              <div class="p-6 bg-gray-50 rounded-lg text-center">
-                <div class="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                  <span>Categories</span>
-                  <% if @has_real_categories %>
-                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                  <% end %>
-                </div>
-                <h3 class="mt-2 font-semibold text-gray-900">Categories configured</h3>
-                <p class="mt-2 text-sm text-gray-600">Add or edit categories and keywords to improve automatic categorization.</p>
-                <div class="mt-4">
-                  <% if @has_real_categories %>
-                    <%= link_to "View categories", categories_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700" %>
-                  <% else %>
-                    <%= link_to "Import categories (YAML)", new_category_import_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700" %>
-                  <% end %>
-                </div>
+              <div class="mt-6">
+                <%= link_to "View transactions", transactions_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
+                <% if @unknown_transactions_count && @unknown_transactions_count > 0 %>
+                  <div class="mt-3">
+                    <%= link_to "Review uncategorized (#{@unknown_transactions_count})", uncategorized_transactions_path, class: "inline-flex items-center justify-center w-full px-3 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 text-sm" %>
+                  </div>
+                <% end %>
               </div>
             </div>
 
-            <% if @incomplete_categories.present? && @incomplete_categories.any? %>
-              <div class="mt-4 p-4 bg-yellow-50 border border-yellow-100 rounded">
-                <div class="text-sm font-semibold text-yellow-800">Some categories need attention</div>
-                <div class="mt-2 text-sm text-yellow-700">The following categories are missing keywords or target settings — update them to improve categorization and targets.</div>
-                <ul class="mt-3 space-y-1">
-                  <% @incomplete_categories.each do |c| %>
-                    <% reasons = [] %>
-                      <% lname = c.name.to_s.downcase %>
-                      <% # Unknown is allowed to have no keywords; Income/Ignore/Unknown allowed to have no target %>
-                      <% reasons << 'missing keywords' if c.keyword_list.empty? && lname != 'unknown' %>
-                      <% comp = c.respond_to?(:target_comparison) ? c.target_comparison.to_s : nil %>
-                      <% unless %w[income ignore unknown].include?(lname) %>
-                        <% reasons << 'no target set' if (comp != 'not_applicable') && (c.target_percentage.nil? || c.target_percentage.to_f <= 0) %>
-                      <% end %>
-                    <li>
-                      <div class="text-sm font-medium text-yellow-800"><%= c.name %></div>
-                      <div class="ml-2 text-xs text-yellow-700">(<%= reasons.join(', ') %>)</div>
-                    </li>
-                  <% end %>
-                </ul>
+            <div class="p-6 bg-gray-50 rounded-lg">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <div class="text-sm font-medium text-gray-500">Step 2</div>
+                  <h3 class="mt-2 text-xl font-semibold text-gray-900">Categories</h3>
+                </div>
+                <details class="text-right">
+                  <summary class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m0-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z"></path></svg>
+                    <span class="ml-2">Help</span>
+                  </summary>
+                  <p class="mt-2 text-sm text-gray-600">Categories define how your transactions are grouped and tracked. Import or edit categories to keep your spending organized.</p>
+                </details>
               </div>
-            <% end %>
-          </div>
-
-          <div class="mt-6 md:mt-6 md:ml-8 w-full md:w-1/3">
-            <div class="p-4 bg-gray-50 rounded-lg h-full flex flex-col justify-between">
-              <div class="text-sm text-gray-500">Quick actions</div>
-              <div class="mt-3 space-y-2">
-                <%= link_to "Open Insights", insights_path, class: "block w-full text-center px-4 py-2 bg-indigo-600 text-white rounded-lg" %>
-                <%= link_to "Spending Breakdown", spending_breakdown_path, class: "block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-lg" %>
+              <div class="mt-6">
+                <div class="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
+                  <div class="text-xs uppercase tracking-wide text-gray-500">Configured</div>
+                  <div class="mt-2 text-3xl font-semibold text-gray-900"><%= @real_categories_count %></div>
+                </div>
+              </div>
+              <div class="mt-6">
+                <% if @has_real_categories %>
+                  <%= link_to "Manage categories", categories_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700" %>
+                <% else %>
+                  <%= link_to "Import categories (YAML)", new_category_import_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700" %>
+                <% end %>
               </div>
             </div>
           </div>
-        </div>
       </div>
     </section>
   <% else %>
@@ -101,87 +92,73 @@
           <p class="mt-2 text-gray-600">To get useful insights and a spending breakdown, first upload your transactions and import or configure categories. This only takes a minute.</p>
         </div>
 
-        <div class="mt-6 md:flex md:items-start md:justify-between">
-          <div class="md:w-2/3">
-            <div class="mt-0 grid sm:grid-cols-2 gap-4">
-              <div class="p-6 bg-gray-50 rounded-lg text-center">
-                <div class="flex items-center justify-center space-x-3">
-                  <div class="text-sm text-gray-500">Step 1</div>
-                  <h3 class="mt-0 font-semibold text-gray-900">Upload transactions</h3>
-                  <% if @has_transactions %>
-                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                  <% else %>
-                    <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12A9 9 0 1112 3a9 9 0 019 9z"></path></svg>
-                  <% end %>
-                </div>
-                <p class="mt-2 text-sm text-gray-600">Import a CSV from your bank. This populates the data required for reports and insights.</p>
-                <% unless @has_transactions %>
-                  <div class="mt-2 text-sm text-yellow-700">Add transactions — import now from the Import page.</div>
-                <% end %>
-                <div class="mt-4">
-                  <% if @has_transactions %>
-                    <%= link_to "View transactions", transactions_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
-                    <% if @unknown_transactions_count && @unknown_transactions_count > 0 %>
-                      <div class="mt-2">
-                        <%= link_to "Review uncategorized (#{@unknown_transactions_count})", uncategorized_transactions_path, class: "inline-flex items-center justify-center w-full px-3 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 text-sm" %>
-                      </div>
-                    <% end %>
-                  <% else %>
-                    <%= link_to "Import transactions", new_import_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
-                  <% end %>
-                </div>
+        <div class="mt-6 grid gap-4 lg:grid-cols-2">
+          <div class="p-6 bg-gray-50 rounded-lg">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="text-sm font-medium text-gray-500">Step 1</div>
+                <h3 class="mt-2 text-xl font-semibold text-gray-900">Transactions</h3>
               </div>
-
-              <div class="p-6 bg-gray-50 rounded-lg text-center">
-                <div class="flex items-center justify-center space-x-3">
-                  <div class="text-sm text-gray-500">Step 2</div>
-                  <h3 class="mt-0 font-semibold text-gray-900">Import categories</h3>
-                  <% if @has_real_categories %>
-                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              <details class="text-right">
+                <summary class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m0-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z"></path></svg>
+                  <span class="ml-2">Help</span>
+                </summary>
+                <p class="mt-2 text-sm text-gray-600">This shows how many transactions are currently imported and the date range covered by your data. Import more transactions to grow the reporting period.</p>
+              </details>
+            </div>
+            <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
+                <div class="text-xs uppercase tracking-wide text-gray-500">Total</div>
+                <div class="mt-2 text-3xl font-semibold text-gray-900"><%= @transactions_count %></div>
+              </div>
+              <div class="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
+                <div class="text-xs uppercase tracking-wide text-gray-500">Period</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900">
+                  <% if @range_start && @range_end %>
+                    <%= @range_start.strftime('%b %-d, %Y') %> – <%= @range_end.strftime('%b %-d, %Y') %>
                   <% else %>
-                    <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12A9 9 0 1112 3a9 9 0 019 9z"></path></svg>
-                  <% end %>
-                </div>
-                <p class="mt-2 text-sm text-gray-600">Use the YAML template to define category keywords and targets, or edit them manually.</p>
-                <% unless @has_real_categories %>
-                  <div class="mt-2 text-sm text-yellow-700">Need to add categories — import them using the YAML template.</div>
-                <% end %>
-                <div class="mt-4">
-                  <% if @has_real_categories %>
-                    <%= link_to "View categories", categories_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700" %>
-                  <% else %>
-                    <%= link_to "Import categories (YAML)", new_category_import_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700" %>
+                    No data yet
                   <% end %>
                 </div>
               </div>
             </div>
+            <div class="mt-6">
+              <%= link_to "View transactions", transactions_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
+              <% if @unknown_transactions_count && @unknown_transactions_count > 0 %>
+                <div class="mt-3">
+                  <%= link_to "Review uncategorized (#{@unknown_transactions_count})", uncategorized_transactions_path, class: "inline-flex items-center justify-center w-full px-3 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 text-sm" %>
+                </div>
+              <% end %>
+            </div>
           </div>
 
-          <div class="mt-6 md:mt-6 md:ml-8 w-full md:w-1/3">
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <div class="text-sm text-gray-500">Data Status</div>
-              <div class="mt-2">
-                <% if @data_available && @stale_days && @stale_days > 0 %>
-                  <span class="inline-flex items-center px-3 py-1 rounded-full bg-yellow-100 text-yellow-800">Stale • <%= pluralize(@stale_days, 'day') %></span>
-                <% elsif @data_available %>
-                  <span class="inline-flex items-center px-3 py-1 rounded-full bg-green-50 text-green-700">Up-to-date</span>
-                <% else %>
-                  <span class="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-gray-600">No data</span>
-                <% end %>
+          <div class="p-6 bg-gray-50 rounded-lg">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="text-sm font-medium text-gray-500">Step 2</div>
+                <h3 class="mt-2 text-xl font-semibold text-gray-900">Categories</h3>
               </div>
-
-              <div class="mt-4">
-                <div class="text-sm text-gray-500">Quick links</div>
-                <div class="mt-3 space-y-2">
-                  <% if @data_available %>
-                    <%= link_to "Open Insights", insights_path, class: "block w-full text-center px-4 py-2 bg-indigo-600 text-white rounded-lg" %>
-                    <%= link_to "Spending Breakdown", spending_breakdown_path, class: "block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-lg" %>
-                  <% else %>
-                    <div class="block w-full text-center px-4 py-2 bg-gray-100 text-gray-500 rounded-lg">Open Insights (locked)</div>
-                    <div class="block w-full text-center px-4 py-2 bg-gray-100 text-gray-500 rounded-lg">Spending Breakdown (locked)</div>
-                  <% end %>
-                </div>
+              <details class="text-right">
+                <summary class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m0-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z"></path></svg>
+                  <span class="ml-2">Help</span>
+                </summary>
+                <p class="mt-2 text-sm text-gray-600">Categories define how your transactions are grouped and tracked. Import or edit categories to keep your spending organized.</p>
+              </details>
+            </div>
+            <div class="mt-6">
+              <div class="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
+                <div class="text-xs uppercase tracking-wide text-gray-500">Configured</div>
+                <div class="mt-2 text-3xl font-semibold text-gray-900"><%= @real_categories_count %></div>
               </div>
+            </div>
+            <div class="mt-6">
+              <% if @has_real_categories %>
+                <%= link_to "Manage categories", categories_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700" %>
+              <% else %>
+                <%= link_to "Import categories (YAML)", new_category_import_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700" %>
+              <% end %>
             </div>
           </div>
         </div>
@@ -189,37 +166,6 @@
     </section>
   <% end %>
 
-  <!-- Compact action cards for navigation (lower emphasis) -->
-  <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-    <div class="p-4 bg-white rounded-lg shadow-sm">
-      <h3 class="text-md font-semibold text-gray-900">Transactions</h3>
-      <p class="mt-1 text-sm text-gray-600">View and manage imported transactions.</p>
-      <div class="mt-3">
-        <%= link_to "Transactions", transactions_path, class: "text-sm text-blue-600 hover:underline" %>
-      </div>
-    </div>
-
-    <div class="p-4 bg-white rounded-lg shadow-sm">
-      <h3 class="text-md font-semibold text-gray-900">Spending Breakdown</h3>
-      <p class="mt-1 text-sm text-gray-600">Targets vs actuals across categories.</p>
-      <div class="mt-3">
-        <% if @data_available %>
-          <%= link_to "View breakdown", spending_breakdown_path, class: "text-sm text-blue-600 hover:underline" %>
-        <% else %>
-          <span class="text-sm text-gray-400">Locked until data is uploaded</span>
-        <% end %>
-      </div>
-    </div>
-
-    <div class="p-4 bg-white rounded-lg shadow-sm">
-      <h3 class="text-md font-semibold text-gray-900">Categories & Imports</h3>
-      <p class="mt-1 text-sm text-gray-600">Edit categories or import YAML templates.</p>
-      <div class="mt-3 space-x-2">
-        <%= link_to "Manage categories", categories_path, class: "text-sm text-blue-600 hover:underline" %>
-        <%= link_to "Import categories", new_category_import_path, class: "text-sm text-blue-600 hover:underline" %>
-      </div>
-    </div>
-  </section>
   </div>
   <footer class="mt-auto py-6">
     <div class="max-w-6xl mx-auto px-6 md:px-12 text-sm text-gray-500">Built with ❤️ — Expense Tracking</div>
