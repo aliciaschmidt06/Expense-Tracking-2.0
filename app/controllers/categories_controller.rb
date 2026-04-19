@@ -5,10 +5,66 @@ class CategoriesController < ApplicationController
   def index
     @categories = Category.all
 
-    # Compute the total of target percentages for all categories so the view
-    # can show a persistent warning if the total isn't 100%.
-    @total_percentage = Category.sum(:target_percentage).to_f
-    @percentages_ok = (@total_percentage - 100.0).abs < 0.01
+    # For new hierarchical structure, calculate total spending percentages
+    @spending_categories = @categories.where(category_type: 'spending')
+    @total_spending_percentage = @spending_categories.sum(:allocation_percentage).to_f
+    @percentages_ok = (@total_spending_percentage - 100.0).abs < 0.01
+
+    respond_to do |format|
+      format.html
+      format.json { render json: @categories }
+    end
+  end
+
+  # GET /categories/pie_chart_data.json
+  # Returns spending categories formatted for pie chart
+  def pie_chart_data
+    spending_categories = Category.where(category_type: 'spending').order(:subcategory)
+    
+    data = spending_categories.map do |c|
+      {
+        id: c.id,
+        name: c.name,
+        subcategory: c.subcategory,
+        percentage: c.allocation_percentage || 0.0,
+        target_comparison: c.target_comparison,
+        keywords: c.keyword_list
+      }
+    end
+
+    total_percentage = data.sum { |d| d[:percentage] }
+
+    render json: {
+      categories: data,
+      total_percentage: total_percentage.round(2),
+      percentages_ok: (total_percentage - 100.0).abs < 0.01
+    }
+  end
+
+  # PATCH /categories/update_percentages.json
+  # Updates allocation percentages for spending categories
+  def update_percentages
+    if params[:categories].blank?
+      return render json: { error: "No categories provided" }, status: :unprocessable_entity
+    end
+
+    begin
+      params[:categories].each do |cat_data|
+        category = Category.find(cat_data[:id])
+        category.update!(
+          name: cat_data[:name],
+          allocation_percentage: cat_data[:percentage].to_f,
+          target_comparison: cat_data[:target_comparison]
+        )
+      end
+
+      render json: { success: true, message: "Percentages updated successfully" }
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: "Category not found" }, status: :not_found
+    rescue StandardError => e
+      Rails.logger.error("Error updating percentages: #{e.message}")
+      render json: { error: e.message }, status: :unprocessable_entity
+    end
   end
 
   # GET /categories/1 or /categories/1.json
@@ -63,34 +119,35 @@ class CategoriesController < ApplicationController
   end
 
   # GET /categories/download_yaml
-  # Exports current categories as a YAML file formatted like public/categories.template.yaml
+  # Exports current categories as a YAML file with hierarchical structure
   def download_yaml
     categories = Category.all
 
-    data = { "categories" => {} }
-    categories.each do |c|
-      key = c.name.to_s.parameterize(separator: '-')
-      details = {}
-      keywords = c.keyword_list
-      # include keywords key only if present to keep YAML tidy
-      details["keywords"] = keywords unless keywords.blank?
-      # Export target percentage using the new mapping convention
-      case c.target_comparison.to_s
-      when 'less_than'
-        details["target_percentage"] = { "less_than" => (c.target_percentage || 0) }
-      when 'greater_than'
-        details["target_percentage"] = { "greater_than" => (c.target_percentage || 0) }
-      when 'not_applicable'
-        details["target_percentage"] = { "not_applicable" => true }
-      else
-        # default to equal_to for backward compatibility
-        details["target_percentage"] = { "equal_to" => (c.target_percentage || 0) }
+    data = {}
+
+    # Group categories by type
+    income_cats = categories.where(category_type: 'income')
+    spending_cats = categories.where(category_type: 'spending')
+
+    # Export Income section
+    if income_cats.any?
+      # Combine all income keywords into a single array
+      all_income_keywords = income_cats.flat_map(&:keyword_list).uniq
+      data["income"] = { "keywords" => all_income_keywords }
+    end
+
+    # Export Spending section
+    if spending_cats.any?
+      spending_data = {}
+      spending_cats.each do |c|
+        subcategory = c.subcategory || c.name.downcase
+        spending_data[subcategory] = c.keyword_list
       end
-      data["categories"][key] = details
+      data["spending_categories"] = spending_data
     end
 
     yaml = YAML.dump(data).sub(/\A---\n/, '')
-    header = "# Exported categories YAML from Expense-Tracking-2.0\n# You can edit and re-upload this file.\n"
+    header = "# Expense Tracking Configuration\n# Export from Expense-Tracking-2.0\n# Percentages are auto-calculated to be equal, adjust in the pie chart\n\n"
 
     send_data(header + yaml, filename: "categories.yaml", type: "text/yaml")
   end
@@ -105,6 +162,6 @@ class CategoriesController < ApplicationController
     # The form submits `keywords` as a plain text field (comma-separated),
     # so permit it as a scalar. The model's `keyword_list` handles parsing.
     def category_params
-      params.require(:category).permit(:name, :target_percentage, :keywords, :target_comparison)
+      params.require(:category).permit(:name, :target_percentage, :keywords, :target_comparison, :category_type, :subcategory, :allocation_percentage)
     end
 end

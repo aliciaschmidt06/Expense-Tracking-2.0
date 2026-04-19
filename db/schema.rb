@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_19_184850) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_19_184851) do
   create_table "auto_upload_histories", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "error_message"
@@ -22,12 +22,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_19_184850) do
   end
 
   create_table "categories", force: :cascade do |t|
+    t.float "allocation_percentage", default: 0.0
+    t.string "category_type", default: "spending"
+    t.text "config_yaml_structure"
     t.datetime "created_at", null: false
     t.text "keywords"
     t.string "name"
+    t.string "subcategory"
     t.string "target_comparison"
     t.float "target_percentage"
     t.datetime "updated_at", null: false
+    t.index ["category_type", "subcategory"], name: "index_categories_on_category_type_and_subcategory"
   end
 
   create_table "settings", force: :cascade do |t|

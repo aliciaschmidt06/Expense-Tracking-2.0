@@ -39,7 +39,7 @@ class Transaction < ApplicationRecord
   end
 
   def set_display
-    # Hide transactions automatically if category is Ignore
-    self.display = false if category&.name == "Ignore"
+    # Hide transactions automatically if category is Ignore or Business
+    self.display = false if category&.is_ignored?
   end
 end

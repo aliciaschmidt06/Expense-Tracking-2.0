@@ -1,6 +1,29 @@
 <div class="min-h-screen w-full bg-gray-50 flex flex-col">
   <!-- top navigation rendered in application layout -->
   
+  <script>
+    // Auto-refresh when auto-uploads complete
+    let lastTransactionCount = <%= @transactions_count %>;
+    
+    function checkForNewTransactions() {
+      fetch('<%= dashboard_data_path(format: :json) %>')
+        .then(response => response.json())
+        .then(data => {
+          if (data.transactions_count > lastTransactionCount) {
+            console.log('📥 New transactions detected! Auto-refreshing...');
+            lastTransactionCount = data.transactions_count;
+            // Small delay to ensure database has synced
+            setTimeout(() => {
+              location.reload();
+            }, 1000);
+          }
+        })
+        .catch(error => console.log('Check poll error:', error));
+    }
+    
+    // Poll every 10 seconds for new transactions (from auto-uploads)
+    setInterval(checkForNewTransactions, 10000);
+  </script>
     <div class="max-w-6xl mx-auto px-6 md:px-12">
   <% if @has_transactions && @has_real_categories %>
     <!-- Completed setup hero -->
@@ -44,6 +67,7 @@
               </div>
               <div class="mt-6">
                 <%= link_to "View transactions", transactions_path, class: "inline-flex items-center justify-center w-full px-4 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700" %>
+                <%= link_to "Show this month's spending report", spending_breakdown_path(month: Date.today.month, year: Date.today.year), class: "inline-flex items-center justify-center w-full px-4 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 mt-3" %>
                 <% if @unknown_transactions_count && @unknown_transactions_count > 0 %>
                   <div class="mt-3">
                     <%= link_to "Review uncategorized (#{@unknown_transactions_count})", uncategorized_transactions_path, class: "inline-flex items-center justify-center w-full px-3 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 text-sm" %>

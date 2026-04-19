@@ -73,8 +73,8 @@ class HomeController < ApplicationController
     @categories = Category.order(:name)
 
     # Prepare quick insights:
-    # special categories to exclude from expense lists (Ignore/Unknown)
-    special_ids = Category.where("LOWER(TRIM(name)) IN (?)", ['ignore', 'unknown']).pluck(:id)
+    # special categories to exclude from expense lists (Ignore/Unknown/Business)
+    special_ids = Category.where("LOWER(TRIM(name)) IN (?)", ['ignore', 'unknown', 'business']).pluck(:id)
 
     # Subscriptions: consider transactions grouped by normalized name + account_name + amount (same price)
     # Exclude Ignore/Unknown (special_ids) from subscription detection
@@ -183,7 +183,7 @@ class HomeController < ApplicationController
     end
 
   # find special categories robustly (case-insensitive, trimmed) using DB to avoid edge cases
-  special_ids = Category.where("LOWER(TRIM(name)) IN (?)", ['ignore', 'unknown']).pluck(:id)
+  special_ids = Category.where("LOWER(TRIM(name)) IN (?)", ['ignore', 'unknown', 'business']).pluck(:id)
 
   # If the user explicitly filtered by one of the special categories, allow showing that category's
   # transactions — only exclude specials when no explicit special category filter is applied.
@@ -275,7 +275,8 @@ class HomeController < ApplicationController
       total_sum: total_sum.round(2),
       income_total: income_total.round(2),
       subscriptions: subscriptions,
-      top_expenses: top_expenses
+      top_expenses: top_expenses,
+      transactions_count: Transaction.count
     }
   end
 
@@ -476,41 +477,49 @@ class HomeController < ApplicationController
     full_scope = full_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
     full_scope = full_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
 
-    # find special categories (case-insensitive)
-    income_cat = Category.where('LOWER(name) = ?', 'income').first
+    # find special categories (by type or name)
+    income_cats = Category.where(category_type: 'income')
     ignore_cat = Category.where('LOWER(name) = ?', 'ignore').first
+    business_cat = Category.where('LOWER(name) = ?', 'business').first
     unknown_cat = Category.where('LOWER(name) = ?', 'unknown').first
 
-    # calculation scope: exclude Ignore and Unknown categories entirely from calculations
+    excluded_cat_ids = [ignore_cat&.id, business_cat&.id, unknown_cat&.id].compact
+
+    # calculation scope: exclude Ignore, Business, and Unknown categories entirely from calculations
     calc_scope = Transaction.all
     calc_scope = calc_scope.where('created_at >= ?', start_date.beginning_of_day) if start_date.present?
     calc_scope = calc_scope.where('created_at <= ?', end_date.end_of_day) if end_date.present?
-    calc_scope = calc_scope.where.not(category_id: ignore_cat.id) if ignore_cat.present?
-    calc_scope = calc_scope.where.not(category_id: unknown_cat.id) if unknown_cat.present?
+    calc_scope = calc_scope.where.not(category_id: excluded_cat_ids) if excluded_cat_ids.any?
 
     # base amount for targets/percentages must be Income transactions only (per request)
-    income_sum = income_cat.present? ? calc_scope.where(category_id: income_cat.id).sum(:amount).to_f : 0.0
+    income_sum = income_cats.present? ? calc_scope.where(category_id: income_cats.pluck(:id)).sum(:amount).to_f : 0.0
     base_sum = income_sum
 
     # still compute total visible sum for display, but don't use it for target math
     total_sum = full_scope.sum(:amount).to_f
 
-    # Build ordered category list: income first, then normal categories, then ignore & unknown at bottom
+    # Build ordered category list: income first, then normal spending categories, then ignore/business/unknown at bottom
     base_cats = Category.all.to_a
     base_cats.compact!
 
     ordered = []
-    ordered << income_cat if income_cat.present?
+    
+    # Add income categories first
+    income_cat_list = base_cats.select { |c| c.category_type == 'income' }.sort_by { |c| c.name.to_s.downcase }
+    ordered.concat(income_cat_list)
 
-    normal_cats = base_cats.reject { |c| [income_cat&.id, ignore_cat&.id, unknown_cat&.id].compact.include?(c.id) }
-    normal_cats = normal_cats.sort_by { |c| c.name.to_s.downcase }
-    ordered.concat(normal_cats)
-    ordered << ignore_cat if ignore_cat.present?
-    ordered << unknown_cat if unknown_cat.present?
+    # Add normal spending categories
+    spending_cats = base_cats.select { |c| c.category_type == 'spending' && !excluded_cat_ids.include?(c.id) }
+    spending_cats = spending_cats.sort_by { |c| c.name.to_s.downcase }
+    ordered.concat(spending_cats)
+
+    # Add excluded categories at the bottom
+    excluded_cat_list = base_cats.select { |c| excluded_cat_ids.include?(c.id) }.sort_by { |c| c.name.to_s.downcase }
+    ordered.concat(excluded_cat_list)
 
     cats = ordered.map do |c|
       next unless c
-      # use full_scope to show transactions for each category (so Ignore/Unknown still list their txs)
+      # use full_scope to show transactions for each category (so excluded/unknown still list their txs)
       txs = full_scope.where(category_id: c.id).order(created_at: :desc).map do |t|
         {
           id: t.id,
@@ -523,14 +532,17 @@ class HomeController < ApplicationController
       end
 
       c_sum = txs.sum { |t| t[:amount].to_f }
-      target_pct = c.target_percentage.to_f
+      target_pct = c.allocation_percentage.to_f > 0 ? c.allocation_percentage.to_f : c.target_percentage.to_f
       # target/actual calculations use base_sum (income_sum) per new requirement
-      target_amount = base_sum * (target_pct / 100.0)
+      target_amount = base_sum > 0 ? (base_sum * (target_pct / 100.0)) : 0.0
       actual_pct = base_sum > 0 ? (c_sum / base_sum * 100.0) : 0.0
 
       {
         id: c.id,
         name: c.name,
+        category_type: c.category_type,
+        subcategory: c.subcategory,
+        allocation_percentage: c.allocation_percentage.to_f.round(2),
         target_percentage: target_pct.round(2),
         target_amount: target_amount.round(2),
         actual_percentage: actual_pct.round(2),
@@ -540,6 +552,6 @@ class HomeController < ApplicationController
       }
     end.compact
 
-    render json: { total_sum: total_sum.round(2), income_summary: { amount: income_sum.round(2), note: 'based on your Income category (keyword-defined) — calculations use Income only; Ignore/Unknown are excluded' }, categories: cats }
+    render json: { total_sum: total_sum.round(2), income_summary: { amount: income_sum.round(2), note: 'based on your Income category (keyword-defined) — calculations use Income only; Ignore/Business/Unknown are excluded' }, categories: cats }
   end
 end

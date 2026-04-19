@@ -18,6 +18,10 @@ Rails.application.routes.draw do
   end
   # Export categories YAML for download
   get 'categories/download_yaml', to: 'categories#download_yaml', as: 'download_categories_yaml'
+  # Pie chart data endpoint
+  get 'categories/pie_chart_data', to: 'categories#pie_chart_data', as: 'pie_chart_data'
+  # Update category percentages from pie chart
+  patch 'categories/update_percentages', to: 'categories#update_percentages', as: 'update_categories_percentages'
   # Show uncategorized transactions (Unknown category)
   get 'uncategorized', to: 'transactions#uncategorized', as: 'uncategorized_transactions'
 

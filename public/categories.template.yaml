@@ -1,44 +1,32 @@
-# Example categories yaml file you can download and fill out.
-# Once finished customizing for yourself, save and upload. 
-categories:
-  unknown:
-    target_percentage:
-      equal_to: 0
-  guilt-free-spending:
+# Expense Tracking Configuration Template
+# Upload this file to configure your income and spending categories
+# Don't include percentages - they'll be auto-calculated and you can adjust via the pie chart
+
+income:
+  keywords:
+    - payroll
+    - salary
+    - interest
+
+spending_categories:
+  dining:
     keywords:
       - restaurant
       - cafe
-    target_percentage:
-      less_than: 30.0
+      - diner
   fixed:
-    keywords:
-      - provident
-      - sofia
-    target_percentage:
-      less_than: 50.0
+    - rent
+    - utilities
+    - insurance
+  guilt_free:
+    - amazon
+    - entertainment
+    - shopping
   investments:
-    keywords:
-      - retirement
-      - stocks
-    target_percentage:
-      greater_than: 10.0
+    - retirement
+    - stocks
   vacation:
-    keywords:
-      - expedia
-    target_percentage:
-      less_than: 10.0
-  income:
-    keywords:
-      - payroll
-    target_percentage:
-      not_applicable: true
-  ignore:
-    keywords:
-      - THANK YOU
-      - pre-authorized
-      - preauthorized
-      - service charge
-      - annual fee
-      - Internet Banking INTERNET TRANSFER
-    target_percentage:
-      equal_to: 0
+    - hotel
+    - airbnb
+    - travel
+

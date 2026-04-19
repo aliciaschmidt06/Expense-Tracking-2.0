@@ -5,8 +5,10 @@ class Category < ApplicationRecord
   # Use the constant and simple helpers instead of ActiveRecord::Enum to avoid
   # compatibility issues across Rails versions.
   TARGET_COMPARISONS = %w[equal_to less_than greater_than not_applicable].freeze
+  CATEGORY_TYPES = %w[income spending].freeze
 
   validates :target_comparison, inclusion: { in: TARGET_COMPARISONS }, allow_nil: true
+  validates :category_type, inclusion: { in: CATEGORY_TYPES }, allow_nil: true
 
   def target_comparison_human
     target_comparison.to_s.humanize unless target_comparison.blank?
@@ -28,6 +30,18 @@ class Category < ApplicationRecord
     target_comparison == 'not_applicable'
   end
 
+  def income?
+    category_type == 'income'
+  end
+
+  def spending?
+    category_type == 'spending'
+  end
+
+  def is_ignored?
+    name.to_s.downcase == "ignore" || name.to_s.downcase == "business"
+  end
+
   # Always return an array
   def keyword_list
     case keywords
@@ -40,8 +54,8 @@ class Category < ApplicationRecord
     end
   end
 
-  # Callback: update transactions if this is the "ignore" category
-  after_save :update_display_for_ignore, if: -> { name.downcase == "ignore" }
+  # Callback: update transactions if this is the "ignore" or "business" category
+  after_save :update_display_for_ignore, if: -> { is_ignored? }
 
   # After any save, try to assign transactions whose names match this
   # category's keywords to this category. This keeps transactions up-to-date
@@ -94,9 +108,9 @@ class Category < ApplicationRecord
       end
 
       if matched
-        # update without running callbacks for speed; set display false if matched is Ignore
+        # update without running callbacks for speed; set display false if matched is Ignore/Business
         attrs = { category_id: matched.id }
-        attrs[:display] = false if matched.name.to_s.downcase == "ignore"
+        attrs[:display] = false if matched.is_ignored?
         tx.update_columns(attrs)
       else
         # No match found — assign to Unknown

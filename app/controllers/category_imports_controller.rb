@@ -15,98 +15,62 @@ class CategoryImportsController < ApplicationController
     begin
       yaml_data = YAML.safe_load(config_file.read)
 
-      total_percentage = 0.0
+      # Clear existing categories for fresh import
+      Category.delete_all
 
-      # helper to extract numeric percentage from either a scalar or the new mapping
-      extract_pct = lambda do |raw_target|
-        case raw_target
-        when Hash
-          if raw_target["equal_to"]
-            raw_target["equal_to"].to_f
-          elsif raw_target["less_than"]
-            raw_target["less_than"].to_f
-          elsif raw_target["greater_than"]
-            raw_target["greater_than"].to_f
-          else
-            0.0
-          end
-        when Numeric
-          raw_target.to_f
+      # Helper to extract keywords from various formats
+      extract_keywords = lambda do |raw_keywords|
+        case raw_keywords
+        when Array
+          raw_keywords.map(&:to_s)
         when String
-          raw_target.to_s.match?(/\A[+-]?\d+(?:\.\d+)?\z/) ? raw_target.to_f : 0.0
+          [raw_keywords]
         else
-          0.0
+          []
         end
       end
 
-      if yaml_data["categories"].present?
-        yaml_data["categories"].each do |_name, details|
-          next unless details.is_a?(Hash)
-          total_percentage += extract_pct.call(details["target_percentage"])
+      # Process Income categories
+      if yaml_data["income"].present?
+        income_data = yaml_data["income"]
+        if income_data["keywords"].is_a?(Array)
+          category = Category.create!(
+            name: "Income",
+            category_type: "income",
+            keywords: income_data["keywords"].map(&:to_s)
+          )
         end
       end
 
-  # total_percentage is computed for validation but we don't expose
-  # it via individual flash keys (they produced incidental flash output
-  # like "100, true, ..."). The categories index computes its own
-  # totals, so avoid polluting flash here.
+      # Process Spending categories and their subcategories
+      if yaml_data["spending_categories"].present? && yaml_data["spending_categories"].is_a?(Hash)
+        spending_data = yaml_data["spending_categories"]
+        
+        # Count spending categories to calculate equal percentages
+        spending_count = spending_data.size
+        equal_percentage = spending_count > 0 ? (100.0 / spending_count) : 0.0
 
-      if yaml_data["categories"].present?
-        yaml_data["categories"].each do |name, details|
-          next unless details.is_a?(Hash)
+        # Create categories for each spending subcategory
+        spending_data.each do |subcategory_name, items_raw|
+          # Handle both array and hash formats
+          keywords = case items_raw
+                     when Array
+                       items_raw.map(&:to_s)
+                     when Hash
+                       # Support backward compatibility with items/keywords keys
+                       items = items_raw["keywords"] || items_raw["items"]
+                       Array(items).map(&:to_s)
+                     else
+                       []
+                     end
 
-          category = Category.find_or_initialize_by(name: name)
-
-          raw_keywords = details["keywords"]
-          category.keywords =
-            case raw_keywords
-            when Array
-              raw_keywords.map(&:to_s)
-            when String
-              [raw_keywords]
-            else
-              []
-            end
-
-          # Support new YAML format where target_percentage may be a scalar or a map
-          raw_target = details["target_percentage"]
-          case raw_target
-          when Hash
-            # Expect one of: equal_to, less_than, greater_than or not_applicable
-            if raw_target["equal_to"]
-              category.target_percentage = raw_target["equal_to"].to_f
-              category.target_comparison = "equal_to"
-            elsif raw_target["less_than"]
-              category.target_percentage = raw_target["less_than"].to_f
-              category.target_comparison = "less_than"
-            elsif raw_target["greater_than"]
-              category.target_percentage = raw_target["greater_than"].to_f
-              category.target_comparison = "greater_than"
-            elsif raw_target["not_applicable"]
-              category.target_percentage = nil
-              category.target_comparison = "not_applicable"
-            else
-              # unknown structure: fallback to numeric 0
-              category.target_percentage = 0
-              category.target_comparison = "equal_to"
-            end
-          when Numeric
-            category.target_percentage = raw_target.to_f
-            category.target_comparison = "equal_to"
-          when String
-            # try parse as numeric
-            if raw_target.to_s.match?(/\A[+-]?\d+(?:\.\d+)?\z/)
-              category.target_percentage = raw_target.to_f
-              category.target_comparison = "equal_to"
-            else
-              category.target_percentage = 0
-              category.target_comparison = "equal_to"
-            end
-          else
-            category.target_percentage = details["target_percentage"] || 0
-            category.target_comparison = "equal_to"
-          end
-          category.save!
+          category = Category.create!(
+            name: subcategory_name.to_s.titleize,
+            category_type: "spending",
+            subcategory: subcategory_name.to_s,
+            keywords: keywords,
+            allocation_percentage: equal_percentage
+          )
         end
       end
 
@@ -122,6 +86,19 @@ class CategoryImportsController < ApplicationController
     rescue StandardError => e
       Rails.logger.error("Category import unexpected error: #{e.class} #{e.message}\n#{e.backtrace.join("\n")}")
       redirect_to new_category_import_path, alert: "Import failed: #{e.message}"
+    end
+  end
+
+  private
+
+  def extract_percentage(raw_percentage)
+    case raw_percentage
+    when Numeric
+      raw_percentage.to_f
+    when String
+      raw_percentage.to_s.match?(/\A[+-]?\d+(?:\.\d+)?\z/) ? raw_percentage.to_f : 0.0
+    else
+      0.0
     end
   end
 end
